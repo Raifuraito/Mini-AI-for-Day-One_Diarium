@@ -17,6 +17,38 @@ INGEST_CHECK_SECONDS = 60    # how often to check for new/changed journal export
 server_process = None
 seconds_since_ingest_check = INGEST_CHECK_SECONDS  # run once immediately on startup
 
+
+def is_chrome_running():
+    """
+    Checks whether Chrome is currently running. This is the one genuinely
+    OS-specific piece of this file -- Windows and Mac don't share a
+    process-listing command -- so only this helper branches by platform;
+    everything else in the watcher loop is identical on both.
+    """
+    try:
+        if sys.platform == "win32":
+            result = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq chrome.exe"],
+                capture_output=True, text=True,
+            )
+            return "chrome.exe" in result.stdout
+        else:
+            # Mac (and Linux, as a bonus) -- pgrep is standard on both.
+            # -f matches against the full command line ("Google Chrome"
+            # is the actual process name on Mac, with a space in it),
+            # which is more forgiving than an exact-name match.
+            result = subprocess.run(
+                ["pgrep", "-f", "Google Chrome"],
+                capture_output=True, text=True,
+            )
+            return result.returncode == 0
+    except FileNotFoundError:
+        # tasklist/pgrep genuinely missing (unusual) -- don't crash the
+        # watcher loop over it, just assume "not running" this cycle and
+        # try again next time.
+        return False
+
+
 print(f"Watcher running: keeps the server up whenever Chrome is open, and "
       f"checks for new journal exports every {INGEST_CHECK_SECONDS}s. "
       f"Leave this window open.")
@@ -32,9 +64,7 @@ while True:
     # instead: whatever order Chrome and this watcher start in, and even if
     # the server process dies for some reason, it gets (re)launched within
     # CHROME_CHECK_SECONDS as long as Chrome is open.
-    result = subprocess.run(["tasklist", "/FI", "IMAGENAME eq chrome.exe"],
-                             capture_output=True, text=True)
-    chrome_running = "chrome.exe" in result.stdout
+    chrome_running = is_chrome_running()
     server_running = server_process is not None and server_process.poll() is None
 
     if chrome_running and not server_running:

@@ -1,0 +1,1390 @@
+<title>Mini AI for Day One &amp; Diarium</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --parchment: #FAF6EE;
+    --parchment-line: #E8E1D2;
+    --parchment-line-soft: #EFE9DC;
+    --card: #FFFFFF;
+    --ink: #232C3D;
+    --ink-soft: #4A5568;
+    --sage: #7C9070;
+    --sage-deep: #5E7052;
+    --sage-wash: #EAEFE5;
+    --warm-grey: #8B8478;
+    --user-bubble: #232C3D;
+    --user-bubble-text: #FAF6EE;
+    --paper-shadow: rgba(35, 44, 61, 0.10);
+    --paper-shadow-soft: rgba(35, 44, 61, 0.06);
+
+    /* Fixed (non-theme-swapping) tokens for the privacy band -- it's a
+       deliberate dark accent block in BOTH themes, not a surface that
+       should flip with light/dark mode. Using the swapping --ink/
+       --parchment tokens here would make it invert into a light box on
+       an otherwise-dark page, which is the opposite of the intent.
+       Deep forest green, not navy -- deliberately in the same family as
+       --sage/--sage-deep so this block reads as "part of" the page's
+       accent color rather than an unrelated hue. Contrast-checked against
+       both --accent-block-text and --accent-block-text-soft: 12.5:1 and
+       7.6:1 respectively, both well past WCAG AA's 4.5:1 for normal text. */
+    --accent-block-bg: #243228;
+    --accent-block-text: #FAF6EE;
+    --accent-block-text-soft: #C7C2B4;
+    --accent-block-line: rgba(250, 246, 238, 0.18);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --parchment: #1C1A16;
+      --parchment-line: #33302A;
+      --parchment-line-soft: #2A2721;
+      --card: #24211C;
+      --ink: #EDE6D6;
+      --ink-soft: #C4BCA9;
+      --sage: #8FAB80;
+      --sage-deep: #A3C293;
+      --sage-wash: #2B3226;
+      --warm-grey: #8C8574;
+      --user-bubble: #EDE6D6;
+      --user-bubble-text: #1C1A16;
+      --paper-shadow: rgba(0, 0, 0, 0.35);
+      --paper-shadow-soft: rgba(0, 0, 0, 0.22);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --parchment: #1C1A16;
+    --parchment-line: #33302A;
+    --parchment-line-soft: #2A2721;
+    --card: #24211C;
+    --ink: #EDE6D6;
+    --ink-soft: #C4BCA9;
+    --sage: #8FAB80;
+    --sage-deep: #A3C293;
+    --sage-wash: #2B3226;
+    --warm-grey: #8C8574;
+    --user-bubble: #EDE6D6;
+    --user-bubble-text: #1C1A16;
+    --paper-shadow: rgba(0, 0, 0, 0.35);
+    --paper-shadow-soft: rgba(0, 0, 0, 0.22);
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+
+  body {
+    margin: 0;
+    background: var(--parchment);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; }
+
+  ::selection { background: var(--sage); color: var(--user-bubble-text); }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  .prose {
+    max-width: 640px;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-weight: 600;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--sage-deep);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 16px;
+    height: 1px;
+    background: var(--sage-deep);
+  }
+
+  /* ---------- Nav ---------- */
+
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: color-mix(in srgb, var(--parchment) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--parchment-line);
+  }
+
+  /* Every section below is a nav-anchor target (#compare, #features, #how,
+     #limitations, #privacy). Without this, jumping to one via the nav links
+     -- or any in-page anchor -- scrolls its top edge flush to y=0, right
+     where the sticky nav above also sits, clipping the section's own
+     heading underneath it. scroll-margin-top leaves clearance equal to
+     roughly the nav's real height (~73px) plus a little breathing room. */
+  section[id] {
+    scroll-margin-top: 88px;
+  }
+
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* Deliberately NOT the padding: 16px 0 shorthand -- this div also
+       carries .wrap (padding: 0 28px), and a shorthand here would zero out
+       .wrap's left/right padding for every longhand it doesn't mention,
+       leaving the brand logo and GitHub button flush against the viewport
+       edge instead of sharing the same margin as the rest of the page. */
+    padding-top: 16px;
+    padding-bottom: 16px;
+    gap: 20px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    font-family: 'Source Serif 4', serif;
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  /* "Mini AI for Day One & Diarium" is too long to share the nav row with
+     the GitHub button on real phone widths (measured: needs 453px+ even
+     with the middle nav-links already hidden) -- below ~480px, swap to
+     the short form instead of letting it overflow the nav bar. */
+  .brand-short { display: none; }
+
+  @media (max-width: 480px) {
+    .brand-full { display: none; }
+    .brand-short { display: inline; }
+  }
+
+  .brand .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sage-deep);
+    flex-shrink: 0;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .nav-links a {
+    text-decoration: none;
+    color: var(--ink-soft);
+    transition: color 0.15s;
+    white-space: nowrap;
+  }
+
+  .nav-links a:hover, .nav-links a:focus-visible { color: var(--ink); }
+
+  /* Below this width there isn't room for brand + 4 links + CTA on one
+     line without wrapping into a jumbled mess -- the anchor links are a
+     convenience, not essential navigation on a single-page site, so they
+     step aside first and brand + CTA (the two things that actually
+     matter on a small screen) keep their room. Measured at 800px (not
+     700px) because the longer brand name plus the GitHub button alone
+     were still overflowing between 700-799px with the links shown. */
+  @media (max-width: 800px) {
+    .nav-links { display: none; }
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 22px;
+    border-radius: 999px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 14.5px;
+    text-decoration: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+  }
+
+  .btn:focus-visible {
+    outline: 2px solid var(--sage-deep);
+    outline-offset: 2px;
+  }
+
+  .btn-primary {
+    background: var(--ink);
+    color: var(--parchment);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px var(--paper-shadow);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border-color: var(--parchment-line);
+    color: var(--ink);
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--sage-deep);
+    background: var(--sage-wash);
+  }
+
+  .btn-sm { padding: 8px 16px; font-size: 13.5px; }
+
+  /* ---------- Hero ---------- */
+
+  .hero {
+    padding: 76px 0 40px;
+    position: relative;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 56px;
+    align-items: center;
+  }
+
+  @media (min-width: 900px) {
+    .hero-grid { grid-template-columns: 1.05fr 1fr; gap: 40px; }
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(38px, 5.4vw, 58px);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin-top: 18px;
+  }
+
+  .hero-copy h1 em {
+    font-style: italic;
+    color: var(--sage-deep);
+  }
+
+  .hero-copy .lede {
+    margin-top: 20px;
+    font-size: 17.5px;
+    color: var(--ink-soft);
+    max-width: 46ch;
+  }
+
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 30px;
+    flex-wrap: wrap;
+  }
+
+  .hero-note {
+    margin-top: 18px;
+    font-size: 13px;
+    color: var(--warm-grey);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .hero-note svg { flex-shrink: 0; }
+
+  /* ---------- Mock chat UI (the honest, real hero graphic) ---------- */
+
+  .mock-wrap {
+    position: relative;
+    padding: 54px 8px 46px;
+  }
+
+  .mock-scribble {
+    position: absolute;
+    z-index: 2;
+    font-family: 'Caveat', cursive;
+    color: var(--sage-deep);
+    font-weight: 600;
+    line-height: 1.2;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .scribble-1 {
+    top: 0;
+    right: -2%;
+    font-size: 20px;
+    transform: rotate(-3deg);
+    text-align: right;
+  }
+
+  .scribble-2 {
+    bottom: 6px;
+    left: 0;
+    font-size: 19px;
+    transform: rotate(2deg);
+  }
+
+  .scribble-arrow {
+    position: absolute;
+    z-index: 2;
+    top: 46px;
+    right: 9%;
+    width: 40px;
+    height: 36px;
+    color: var(--sage-deep);
+    pointer-events: none;
+  }
+
+  /* On narrow screens the mock-wrap itself is nearly the full viewport
+     width, so a right-aligned scribble anchored past its edge (right:
+     -2%) runs straight into the edge of the screen and gets clipped.
+     Pull it fully inside the container and shrink both scribbles a touch
+     so they read as marginalia next to the phone, not a screen-edge crop. */
+  @media (max-width: 480px) {
+    .scribble-1 {
+      right: 2%;
+      font-size: 16px;
+    }
+    .scribble-2 {
+      font-size: 15px;
+    }
+    .scribble-arrow {
+      top: 40px;
+      right: 12%;
+      width: 32px;
+      height: 30px;
+    }
+  }
+
+  .phone {
+    position: relative;
+    z-index: 1;
+    max-width: 380px;
+    margin: 0 auto;
+    background: var(--card);
+    border-radius: 30px;
+    border: 1px solid var(--parchment-line);
+    box-shadow: 0 30px 60px -20px var(--paper-shadow), 0 10px 24px -8px var(--paper-shadow-soft);
+    overflow: hidden;
+    transform: rotate(-1.1deg);
+  }
+
+  .phone-head {
+    padding: 18px 20px 13px;
+    border-bottom: 1px solid var(--parchment-line);
+    background: var(--parchment);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .phone-head h4 {
+    font-family: 'Source Serif 4', serif;
+    font-weight: 600;
+    font-size: 16px;
+    margin: 0;
+  }
+
+  .phone-head .zap {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--sage-wash);
+    color: var(--sage-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  .phone-body {
+    background: var(--parchment);
+    padding: 18px 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    background-image: repeating-linear-gradient(
+      to bottom, transparent, transparent 30px,
+      var(--parchment-line-soft) 30px, var(--parchment-line-soft) 31px
+    );
+  }
+
+  .msg-row { display: flex; flex-direction: column; max-width: 88%; }
+  .msg-row.user { align-self: flex-end; align-items: flex-end; }
+  .msg-row.journal { align-self: flex-start; align-items: flex-start; }
+
+  .msg-date {
+    font-family: 'Source Serif 4', serif;
+    font-style: italic;
+    font-size: 10.5px;
+    color: var(--sage-deep);
+    margin-bottom: 3px;
+    padding: 0 3px;
+  }
+
+  .msg-bubble {
+    padding: 9px 13px;
+    border-radius: 4px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+
+  .msg-row.user .msg-bubble {
+    background: var(--user-bubble);
+    color: var(--user-bubble-text);
+    border-radius: 13px 13px 3px 13px;
+  }
+
+  .msg-row.journal .msg-bubble {
+    font-family: 'Caveat', cursive;
+    font-weight: 500;
+    font-size: 18px;
+    line-height: 1.35;
+    color: var(--ink);
+    padding: 4px 6px;
+  }
+
+  .msg-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'Inter', sans-serif;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--sage-deep);
+    background: var(--sage-wash);
+    border-radius: 999px;
+    padding: 3px 9px;
+    margin-top: 6px;
+  }
+
+  .phone-input {
+    margin: 2px 12px 14px;
+    background: var(--card);
+    border: 1px solid var(--parchment-line);
+    border-radius: 20px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--warm-grey);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* ---------- Section shell ---------- */
+
+  section { padding: 88px 0; }
+  section.tight { padding: 56px 0; }
+
+  .section-head { margin-bottom: 48px; }
+  .section-head h2 {
+    font-size: clamp(28px, 3.4vw, 36px);
+    margin-top: 14px;
+    letter-spacing: -0.005em;
+  }
+  .section-head .lede {
+    margin-top: 14px;
+    font-size: 16px;
+    color: var(--ink-soft);
+    max-width: 56ch;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--parchment-line);
+    margin: 0;
+  }
+
+  /* ---------- About band ---------- */
+
+  .about-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    background: var(--parchment-line);
+    border: 1px solid var(--parchment-line);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  @media (min-width: 700px) {
+    .about-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .about-item {
+    background: var(--card);
+    padding: 28px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 92px;
+  }
+
+  .about-item .num {
+    font-family: 'Source Serif 4', serif;
+    font-style: italic;
+    font-size: 16.5px;
+    font-weight: 600;
+    color: var(--sage-deep);
+    line-height: 1.4;
+  }
+
+  /* ---------- Limitations ---------- */
+
+  .limitations-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  @media (min-width: 760px) {
+    .limitations-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  .limitation-card {
+    border: 1px solid var(--parchment-line);
+    border-left: 3px solid var(--sage);
+    border-radius: 10px;
+    padding: 24px 26px;
+    background: var(--card);
+  }
+
+  .limitation-card h3 {
+    font-size: 16.5px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .limitation-card p {
+    margin: 12px 0 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+  }
+
+  .limitation-card p:first-of-type { margin-top: 10px; }
+
+  .limitation-split {
+    margin: 14px 0 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 7px 12px;
+  }
+
+  .limitation-split dt {
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 13.5px;
+    white-space: nowrap;
+  }
+
+  .limitation-split dd {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+
+  /* Progressive disclosure for the precise/technical version of each
+     limitation -- plain language is what's on the page by default, this
+     is a native <details> toggle for anyone who wants the exact wording
+     (platform-by-platform specifics, sourcing, etc). No JS needed. */
+  .tech-details {
+    margin-top: 16px;
+  }
+
+  .tech-details summary {
+    cursor: pointer;
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--sage-deep);
+    user-select: none;
+  }
+
+  .tech-details summary::-webkit-details-marker { display: none; }
+
+  .tech-details summary::before {
+    content: "+";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1px solid var(--sage-deep);
+    font-size: 11px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .tech-details[open] summary::before { content: "\2212"; }
+
+  .tech-details summary:hover { color: var(--sage); }
+  .tech-details summary:hover::before { border-color: var(--sage); }
+
+  .tech-details .tech-content {
+    margin-top: 12px;
+    padding-top: 12px;
+    padding-left: 21px;
+    border-top: 1px solid var(--parchment-line-soft);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--warm-grey);
+  }
+
+  .tech-details .tech-content p + p { margin-top: 10px; }
+
+  .limitations-footer {
+    margin: 28px 4px 0;
+    font-size: 13.5px;
+    color: var(--warm-grey);
+  }
+
+  .limitations-footer a {
+    color: var(--sage-deep);
+    text-decoration: underline;
+    text-decoration-color: var(--parchment-line);
+    text-underline-offset: 2px;
+  }
+
+  .limitations-footer a:hover { text-decoration-color: var(--sage-deep); }
+
+  /* ---------- Feature grid ---------- */
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    background: var(--parchment-line);
+    border: 1px solid var(--parchment-line);
+    border-radius: 18px;
+    overflow: hidden;
+  }
+
+  @media (min-width: 700px) {
+    .feature-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (min-width: 1020px) {
+    .feature-grid { grid-template-columns: 1fr 1fr 1fr; }
+  }
+
+  .feature {
+    background: var(--card);
+    padding: 30px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .feature-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--sage-wash);
+    color: var(--sage-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .feature h3 {
+    font-size: 17.5px;
+    font-weight: 600;
+  }
+
+  .feature p {
+    margin: 0;
+    font-size: 14.5px;
+    color: var(--ink-soft);
+  }
+
+  .feature .tag-note {
+    margin-top: 2px;
+    font-family: 'Caveat', cursive;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--sage-deep);
+  }
+
+  .feature p.feature-caveat {
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    color: var(--warm-grey);
+  }
+
+  .feature-caveat a {
+    color: var(--warm-grey);
+    text-decoration: underline;
+    text-decoration-color: var(--parchment-line);
+    text-underline-offset: 2px;
+  }
+
+  .feature-caveat a:hover { color: var(--sage-deep); }
+
+  /* ---------- How it works ---------- */
+
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 22px;
+    padding: 26px 0;
+    border-top: 1px solid var(--parchment-line);
+  }
+  .step:last-child { border-bottom: 1px solid var(--parchment-line); }
+
+  .step-num {
+    font-family: 'Source Serif 4', serif;
+    font-style: italic;
+    font-size: 20px;
+    color: var(--sage-deep);
+    padding-top: 2px;
+  }
+
+  .step h3 {
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  .step p {
+    margin: 6px 0 0;
+    color: var(--ink-soft);
+    font-size: 14.5px;
+    max-width: 58ch;
+  }
+
+  .step code {
+    background: var(--sage-wash);
+    color: var(--sage-deep);
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: 'SF Mono', Consolas, monospace;
+  }
+
+  /* ---------- Workflow illustration (step 1 + 2, drawn out) ---------- */
+
+  .workflow {
+    margin-top: 52px;
+    padding: 40px 32px;
+    background: var(--card);
+    border: 1px solid var(--parchment-line);
+    border-radius: 18px;
+  }
+
+  .workflow-cap {
+    text-align: center;
+    font-family: 'Caveat', cursive;
+    font-weight: 600;
+    font-size: 19px;
+    color: var(--sage-deep);
+    margin: 0 0 28px;
+    transform: rotate(-1deg);
+  }
+
+  .workflow-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  @media (min-width: 700px) {
+    .workflow-row { flex-direction: row; align-items: flex-start; justify-content: center; gap: 0; }
+  }
+
+  .workflow-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    width: 168px;
+    flex-shrink: 0;
+  }
+
+  .workflow-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--sage-wash);
+    color: var(--sage-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .workflow-node .label {
+    margin-top: 12px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.35;
+  }
+
+  .workflow-node .sub {
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--warm-grey);
+    line-height: 1.4;
+  }
+
+  .workflow-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 168px;
+    padding: 8px 0;
+  }
+
+  @media (min-width: 700px) {
+    .workflow-connector { width: 84px; margin-top: 18px; }
+  }
+
+  .workflow-connector .caption {
+    font-family: 'Caveat', cursive;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--sage-deep);
+    white-space: nowrap;
+  }
+
+  .workflow-connector svg {
+    color: var(--sage);
+    /* Horizontal arrow by default (mobile: rotated to point down). */
+    transform: rotate(90deg);
+    margin: 2px 0;
+  }
+
+  @media (min-width: 700px) {
+    .workflow-connector svg { transform: none; margin: 2px 0 0; }
+  }
+
+  /* ---------- Privacy band ---------- */
+
+  .privacy-band {
+    background: var(--accent-block-bg);
+    color: var(--accent-block-text);
+    border-radius: 22px;
+    padding: 56px 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  @media (max-width: 700px) {
+    .privacy-band { padding: 40px 26px; }
+  }
+
+  /* A fixed accent color (not the theme's --sage) for the eyebrow here,
+     since it sits on the fixed dark block above, not the page ground --
+     it needs to read correctly against --accent-block-bg specifically,
+     in both themes, not shift with the page's own accent. */
+  .privacy-band .eyebrow { color: #8FAB80; }
+  .privacy-band .eyebrow::before { background: #8FAB80; }
+
+  .privacy-band h2 {
+    color: var(--accent-block-text);
+    font-size: clamp(24px, 2.9vw, 30px);
+    margin-top: 14px;
+    max-width: 32ch;
+  }
+
+  .privacy-note-text {
+    margin: 16px 0 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    max-width: 56ch;
+    color: var(--accent-block-text-soft);
+  }
+
+  /* ---------- Cost table ---------- */
+
+  .cost-table {
+    border: 1px solid var(--parchment-line);
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--card);
+  }
+
+  .cost-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: baseline;
+    padding: 18px 26px;
+    border-top: 1px solid var(--parchment-line);
+  }
+
+  /* The Max Recall feature card links to #tagging-cost directly (this row
+     specifically, not just the section) -- same sticky-nav clearance issue
+     as the section anchors above, so it needs its own scroll-margin-top. */
+  #tagging-cost {
+    scroll-margin-top: 88px;
+  }
+
+  .cost-row:first-child { border-top: none; }
+
+  .cost-row .what { font-size: 14.5px; font-weight: 500; }
+  .cost-row .what small {
+    display: block;
+    font-weight: 400;
+    color: var(--warm-grey);
+    font-size: 13px;
+    margin-top: 3px;
+  }
+
+  .cost-row .amount {
+    font-family: 'Source Serif 4', serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--sage-deep);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cost-note {
+    margin: 14px 4px 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--warm-grey);
+    max-width: 62ch;
+  }
+
+  /* ---------- CTA ---------- */
+
+  .cta {
+    text-align: center;
+    padding: 30px 0 20px;
+  }
+
+  .cta h2 {
+    font-size: clamp(30px, 4vw, 42px);
+    max-width: 20ch;
+    margin: 0 auto;
+  }
+
+  .cta .lede {
+    margin: 16px auto 0;
+    color: var(--ink-soft);
+    max-width: 48ch;
+    font-size: 16px;
+  }
+
+  .cta-actions {
+    margin-top: 30px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  /* ---------- Footer ---------- */
+
+  footer {
+    border-top: 1px solid var(--parchment-line);
+    padding: 36px 0 48px;
+    margin-top: 40px;
+  }
+
+  .footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 13.5px;
+    color: var(--warm-grey);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 20px;
+  }
+
+  .footer-links a { text-decoration: none; color: var(--warm-grey); }
+  .footer-links a:hover { color: var(--ink); }
+
+  code.inline {
+    background: var(--sage-wash);
+    color: var(--sage-deep);
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: 0.92em;
+    font-family: 'SF Mono', Consolas, monospace;
+  }
+</style>
+
+<nav>
+  <div class="wrap nav-inner">
+    <a href="#top" class="brand"><span class="dot"></span><span class="brand-full">Mini AI for Day One &amp; Diarium</span><span class="brand-short">Mini AI</span></a>
+    <div class="nav-links">
+      <a href="#compare">What this is</a>
+      <a href="#features">Features</a>
+      <a href="#how">Setup</a>
+      <a href="#privacy">Privacy</a>
+    </div>
+    <a href="https://github.com/Raifuraito/journal-rag" class="btn btn-primary btn-sm">View on GitHub</a>
+  </div>
+</nav>
+
+<div id="top"></div>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow">Free &amp; self-hosted</span>
+      <h1>Your journal,<br>finally <em>talking back.</em></h1>
+      <p class="lede">
+        Ask your own journal a question in plain English and get a real answer &mdash;
+        pulled from what you actually wrote, running entirely on your own computer.
+        No subscription, no cloud copy of your entries, no one else reading along.
+      </p>
+      <div class="hero-actions">
+        <a href="https://github.com/Raifuraito/journal-rag" class="btn btn-primary">
+          View on GitHub
+        </a>
+        <a href="#how" class="btn btn-ghost">See how it works</a>
+      </div>
+      <div class="hero-note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 5v6c0 5.5 3.4 9.7 8 11 4.6-1.3 8-5.5 8-11V5l-8-3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        Your journal stays on your machine &mdash; always
+      </div>
+    </div>
+
+    <div class="mock-wrap">
+      <span class="mock-scribble scribble-1">answers in a cozy<br>handwritten font!</span>
+      <svg class="scribble-arrow" viewBox="0 0 46 40" fill="none">
+        <path d="M6 3C10 14 12 24 22 34" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <path d="M12 30L21 35.5L20 24" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="phone">
+        <div class="phone-head">
+          <h4>Journal</h4>
+          <span class="zap">&#9889;</span>
+        </div>
+        <div class="phone-body">
+          <div class="msg-row user">
+            <div class="msg-bubble">what have i said about starting the garden?</div>
+          </div>
+          <div class="msg-row journal">
+            <div class="msg-date"><em>Mar 14 &middot; Apr 2 &middot; May 19</em></div>
+            <div class="msg-bubble">You've mentioned it three times this spring &mdash; mostly excited, a little overwhelmed by the raised beds. May 19th you finally ordered the soil.</div>
+            <span class="msg-tag">&#9889; Max Recall &middot; 3 entries</span>
+          </div>
+        </div>
+        <div class="phone-input">
+          Ask your journal anything&hellip;
+          <span>&#8593;</span>
+        </div>
+      </div>
+      <span class="mock-scribble scribble-2">runs on YOUR<br>computer, not ours</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="compare" class="tight">
+    <div class="wrap">
+      <div class="section-head prose">
+        <span class="eyebrow">What this is</span>
+        <h2>A small, open-source tool that answers questions about your journal.</h2>
+        <p class="lede">Runs on your computer, with your own API key &mdash; no account, nothing in between. Export from Day One or Diarium, point this at the file, start asking.</p>
+      </div>
+
+      <div class="about-grid">
+        <div class="about-item">
+          <div class="num">Local by design</div>
+        </div>
+        <div class="about-item">
+          <div class="num">Free to download, API cost only</div>
+        </div>
+        <div class="about-item">
+          <div class="num">Open source</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <section id="features">
+    <div class="wrap">
+      <div class="section-head prose">
+        <span class="eyebrow">What it actually does</span>
+        <h2>Built for the questions a plain search box can't answer.</h2>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature">
+          <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+          <h3>Ask it anything</h3>
+          <p>"What was I feeling last spring?" or "Detail my trip to California" &mdash; asked in plain English, answered from entries that are actually relevant, not a keyword match.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+          <h3>Max Recall</h3>
+          <p>Toggle it on for "everything about X" questions, and it pulls <em>every</em> tagged entry on that topic &mdash; not just the handful that rank highest.</p>
+          <span class="tag-note">nothing gets left out</span>
+          <p class="feature-caveat">Needs tagging turned on first &mdash; <a href="#tagging-cost">optional, and off by default</a>.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18M8 13h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+          <h3>Photo search</h3>
+          <p>Finds photos by what's visually in them, using CLIP &mdash; "show me the beach photo" can work even if you never wrote the word "beach."</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 19V6a2 2 0 012-2h11l3 3v12a2 2 0 01-2 2H6a2 2 0 01-2-2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 21v-6h6v6" stroke="currentColor" stroke-width="1.8"/></svg></div>
+          <h3>Remembers the conversation</h3>
+          <p>Follow-ups like "tell me more about that" work naturally, across turns &mdash; it's a conversation, not a search bar you retype every time.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 17l5-5 4 4 8-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <h3>Mood over time</h3>
+          <p>A monthly sentiment chart built from your own words, with no extra work &mdash; a byproduct of the same pass that indexes everything else.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M7 11V8a5 5 0 0110 0v3" stroke="currentColor" stroke-width="1.8"/></svg></div>
+          <h3>Runs where you already are</h3>
+          <p>A local web app, phone-friendly over Tailscale, installable to your home screen &mdash; feels like an app, stays entirely on hardware you own.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <section id="how" class="tight">
+    <div class="wrap">
+      <div class="section-head prose">
+        <span class="eyebrow">Setup</span>
+        <h2>No coding required &mdash; here's the whole path.</h2>
+        <p class="lede">Your journal has to get from the app you wrote it in, onto the computer that'll answer questions about it. That's really the whole job. Here's what that looks like end to end &mdash; a setup page handles the technical middle part for you, from your browser.</p>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div>
+            <h3>Export your journal</h3>
+            <p>Open Day One or Diarium and use its export option to save your entries as a file. How easy this is depends on which app and device you use &mdash; see <a href="#limitations">Before you export</a> below.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div>
+            <h3>Get that file onto this computer</h3>
+            <p>Already journaling on this computer? Skip this one. Exported from your phone instead? Get the file over however's easiest &mdash; a cloud folder like Dropbox or iCloud, emailing it to yourself, or a cable all work fine.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div>
+            <h3>Double-click the launcher</h3>
+            <p><code>start_setup.bat</code> on Windows, <code>start_setup.command</code> on Mac. It checks for Python, helps you get it if you don't have it, and opens the setup page automatically.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div>
+            <h3>Paste in an API key</h3>
+            <p>A couple of minutes at console.anthropic.com. The setup page can install the required packages for you too &mdash; entirely optional, one click.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">5</div>
+          <div>
+            <h3>Drop the file in, and ask away</h3>
+            <p>Put the export in the folder you chose, run <code>ingest.py</code> once, and start asking. Full walkthrough is in the repo's README.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="workflow">
+        <p class="workflow-cap">steps 1 &amp; 2, drawn out&hellip;</p>
+        <div class="workflow-row">
+          <div class="workflow-node">
+            <div class="workflow-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="6" y="2" width="12" height="20" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M10 18h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="label">Day One or Diarium</div>
+            <div class="sub">wherever you journal</div>
+          </div>
+
+          <div class="workflow-connector">
+            <span class="caption">export</span>
+            <svg width="70" height="24" viewBox="0 0 70 24" fill="none"><path d="M2 12C20 6 40 18 58 11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M49 4L60 11L48 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+
+          <div class="workflow-node">
+            <div class="workflow-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15a1 1 0 01-1 1H6a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="label">the exported file</div>
+            <div class="sub">on your phone or computer</div>
+          </div>
+
+          <div class="workflow-connector">
+            <span class="caption">however's easiest</span>
+            <svg width="70" height="24" viewBox="0 0 70 24" fill="none"><path d="M2 12C20 6 40 18 58 11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M49 4L60 11L48 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+
+          <div class="workflow-node">
+            <div class="workflow-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M3 6a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="label">this project's folder</div>
+            <div class="sub">where the setup wizard points</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <section id="limitations" class="tight">
+    <div class="wrap">
+      <div class="section-head prose">
+        <span class="eyebrow">Before you export</span>
+        <h2>Step 1 (exporting) is easy for some, a bit of a chore for others.</h2>
+        <p class="lede">The export itself is entirely up to Day One or Diarium, and the two behave pretty differently. Here's what to expect from each:</p>
+      </div>
+
+      <div class="limitations-grid">
+        <div class="limitation-card">
+          <h3>If you use Day One</h3>
+          <p>You can export just part of your journal, or the whole thing &mdash; depends on your device.</p>
+          <dl class="limitation-split">
+            <dt>Mac / iPhone</dt>
+            <dd>pick a date range or tag, export just that</dd>
+            <dt>Windows / Android</dt>
+            <dd>no easy way to pick just part &mdash; usually the whole journal</dd>
+          </dl>
+          <details class="tech-details">
+            <summary>Technical details</summary>
+            <div class="tech-content">
+              <p>On Mac and iOS, Day One lets you filter by date range or tag before exporting, so a partial export is genuinely possible. On Android, there's some ability to narrow things down, though it's less clearly documented. On Windows and the web app, Day One currently exports your entire journal only &mdash; there's no built-in way to export just a range of entries.</p>
+              <p>If you're on Windows or the web: your first export (and re-exports) will be your whole journal every time. This project hashes each entry and only re-processes ones that changed, so a repeated whole-journal export is still cheap and safe &mdash; it just means the export step itself takes a bit longer than a quick filtered one would.</p>
+            </div>
+          </details>
+        </div>
+        <div class="limitation-card">
+          <h3>If you use Diarium</h3>
+          <p>Exports your whole journal every time, on every device &mdash; and the file format isn't officially documented, so this project makes its best guess at reading it, and says clearly if it can't.</p>
+          <details class="tech-details">
+            <summary>Technical details</summary>
+            <div class="tech-content">
+              <p>Diarium doesn't publish a schema for its JSON export, and based on its own community forum, exporting a specific date range or tag doesn't currently appear to be a built-in option &mdash; a full export looks to be the normal path today. Diarium's own developer has also confirmed the app can't re-import its own JSON export, so there's no strict format being maintained internally to check against either.</p>
+              <p>This project's Diarium support is genuinely best-effort: it tries several plausible field names rather than one guess, and fails with a clear, specific error if your export doesn't match &mdash; rather than a silent wrong answer. If it doesn't work for you, a GitHub issue with a small redacted sample helps get it fixed for real.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <p class="limitations-footer">Full details, including exact export steps for both apps and both mobile and desktop, are in <a href="https://github.com/Raifuraito/journal-rag#readme">the README</a>.</p>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <section class="tight">
+    <div class="wrap">
+      <div class="section-head prose">
+        <span class="eyebrow">What it costs</span>
+        <h2>Pay-as-you-go, to Anthropic directly &mdash; nothing to this project.</h2>
+      </div>
+      <div class="cost-table">
+        <div class="cost-row">
+          <div class="what">Running the app, embedding entries<small>Local model, no API calls involved</small></div>
+          <div class="amount">Free</div>
+        </div>
+        <div class="cost-row" id="tagging-cost">
+          <div class="what">Tagging your existing journal<small>Optional, and off by default &mdash; the setup wizard asks before turning it on. Roughly 1,600 entries as a reference point.</small></div>
+          <div class="amount">$1&ndash;3 total</div>
+        </div>
+        <div class="cost-row">
+          <div class="what">Asking a question<small>Scales with the question, not your journal's size</small></div>
+          <div class="amount">$0.001&ndash;0.004</div>
+        </div>
+      </div>
+      <p class="cost-note">Tagging is what Max Recall (above) needs to work &mdash; without it, the journal still answers questions perfectly well, just via similarity search instead of a guaranteed-complete topic match.</p>
+    </div>
+  </section>
+
+  <section id="privacy">
+    <div class="wrap">
+      <div class="privacy-band">
+        <span class="eyebrow">A quiet note on privacy</span>
+        <h2>Your journal stays on your machine, and only the few lines relevant to a question ever leave it.</h2>
+        <p class="privacy-note-text">There's no account, no sync service, and the page that holds your API key only ever listens on your own computer &mdash; never your phone, your network, or anywhere else.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="wrap">
+      <h2>Your entries already have the answers.</h2>
+      <p class="lede">Clone it, read every line, and start asking &mdash; it's yours to run.</p>
+      <div class="cta-actions">
+        <a href="https://github.com/Raifuraito/journal-rag" class="btn btn-primary">View on GitHub</a>
+        <a href="https://github.com/Raifuraito/journal-rag#readme" class="btn btn-ghost">Read the setup guide</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap footer-inner">
+    <span>Mini AI for Day One &amp; Diarium &mdash; MIT licensed, built for personal use.</span>
+    <div class="footer-links">
+      <a href="https://github.com/Raifuraito/journal-rag">GitHub</a>
+      <a href="https://github.com/Raifuraito/journal-rag/blob/main/SECURITY.md">Security</a>
+      <a href="https://github.com/Raifuraito/journal-rag#readme">Docs</a>
+    </div>
+  </div>
+</footer>

@@ -124,6 +124,17 @@ DIVERSITY_MAX_ENTRIES = None  # None = show all entries
 # questions -- pulling EVERY entry tagged with a topic, not just the top-K
 # most semantically similar ones.
 #
+# Whether ingest.py calls the API to tag entries at all. OFF by default on
+# purpose: tagging is a real (if small) per-entry API cost, and on a first
+# ingest of a large journal that adds up to real money before you've had a
+# chance to decide if you even want it. With this off, ingest.py still
+# does everything else (embedding, chunking, sentiment) for free -- you
+# just won't have Max Recall until you turn this on and re-run ingest
+# (or tag_backfill.py) to catch existing entries up. Turn it on either by
+# checking the box on the setup wizard page (it writes this same value to
+# your .env as ENABLE_TAGGING), or by flipping this line directly.
+ENABLE_TAGGING = os.environ.get("ENABLE_TAGGING", "false").strip().lower() == "true"
+
 # Model used for tag extraction. Defaults to the same model as everything
 # else; point this at a cheaper/faster one if you want to cut cost.
 TAG_EXTRACTION_MODEL = "claude-haiku-4-5"  # Haiku instead of Sonnet -- tagging just

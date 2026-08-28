@@ -1,121 +1,201 @@
 # Ask Your Journal
 
-A local RAG (retrieval-augmented generation) pipeline that lets you ask questions about your Day One journal in plain English. Runs entirely on your own machine using the Anthropic API — no data leaves your computer except the specific journal excerpts sent per question.
+A private, local AI assistant for your journal. Ask it questions in plain English -- *"What was I feeling last spring?"*, *"Detail my trip to California"*, *"What have I not reflected on in a while?"* -- and it searches your actual entries (and photos) to answer, the same way you'd ask a friend who'd read the whole thing.
 
-## What it does
+It runs entirely on your own computer. Your journal itself never leaves your machine -- only the small handful of entries relevant to whatever you just asked get sent out, to generate that one answer.
 
-- Ask natural questions: *"What was I feeling last spring?"* or *"Detail my trip to California"*
-- Searches journal text **and** photos together (Phase 5 ambient visual search)
-- Finds photos by visual content using CLIP — *"show me the beach photo"* works even if you never wrote the word "beach"
-- Smart question routing: trend questions, synthesis/action-item questions, date-range questions, and photo searches all use different retrieval strategies
-- **Max Recall mode**: a ⚡ toggle in the chat UI that guarantees completeness for "everything about X" questions — instead of just the top handful of semantically similar entries, it pulls *every* entry tagged with that topic. Costs a bit more per question (more context = more tokens) but is built for the questions where missing an entry actually matters
-- Conversation memory: *"tell me more about that"* works across turns
-- Mood chart: monthly sentiment scores from your entries
-- Phone-friendly web app, installable to your home screen via Tailscale
+This guide assumes no prior context. If you've never written a line of code, you can still get this running by following it top to bottom.
 
-## Setup
+## Table of contents
 
-### 1. Install dependencies
+- [Is this for you?](#is-this-for-you)
+- [What this actually costs](#what-this-actually-costs)
+- [Before you start: what you'll need](#before-you-start-what-youll-need)
+- [Step 1: Download and open the folder](#step-1-download-and-open-the-folder)
+- [Step 2: Run the setup wizard](#step-2-run-the-setup-wizard)
+- [Step 3: Export your journal](#step-3-export-your-journal)
+  - [Exporting from a computer](#exporting-from-a-computer)
+  - [Exporting from a phone (iOS/Android)](#exporting-from-a-phone-iosandroid)
+  - [Keeping phone and computer in sync automatically](#keeping-phone-and-computer-in-sync-automatically)
+- [Step 4: Bring your journal in](#step-4-bring-your-journal-in)
+- [Step 5: Start asking questions](#step-5-start-asking-questions)
+- [Using it from your phone](#using-it-from-your-phone)
+- [Keeping it up to date automatically](#keeping-it-up-to-date-automatically)
+- [Tags and Max Recall, explained](#tags-and-max-recall-explained)
+- [Photo search (optional)](#photo-search-optional)
+- [All the settings, explained](#all-the-settings-explained)
+- [Known limitations, please read this section](#known-limitations-please-read-this-section)
+- [Privacy and security](#privacy-and-security)
+- [If something goes wrong](#if-something-goes-wrong)
+- [Project structure](#project-structure)
+- [License](#license)
+
+## Is this for you?
+
+This project exists as a free, self-hosted alternative to paying for Day One's built-in AI features (or a similar paid journaling-AI product). If you already journal in **Day One**, this is close to a drop-in addition -- export your journal, point this at the export, and start asking it questions, at whatever the API costs actually are (typically a few cents to a few dollars a month, see below) instead of a subscription.
+
+It also has **best-effort, not-fully-verified** support for **Diarium** exports, and a generic fallback that has a reasonable chance of working with other journaling apps that export to JSON. See [Known limitations](#known-limitations-please-read-this-section) for exactly what "best-effort" means here before you rely on it.
+
+If you don't journal digitally in a format this can read, this project won't be useful to you as-is.
+
+## What this actually costs
+
+Nothing here requires a subscription. What it costs is small, pay-as-you-go usage of Anthropic's API (the company that makes Claude, the AI model this uses to answer questions and extract tags):
+
+- **Setting up and running the app itself**: free. Flask, the vector database, and the web page all run locally with no cost.
+- **Embedding your journal into the local database**: free. This uses a local model, not an API call.
+- **Extracting tags** (what powers Max Recall, see below) -- **entirely optional, off by default**: a small fraction of a cent per entry, if and when you turn it on. Tagging roughly 1,600 entries, for example, costs on the order of $1-3 total, one time -- after that, new entries get tagged automatically as you add them, a few fractions of a cent each. If you never turn tagging on, this cost simply never happens; everything else in the app works the same either way.
+- **Asking a question**: roughly $0.001-0.004 (a tenth to four tenths of a cent) per question in typical use. This scales with how much context a question needs, not with how big your journal is -- a normal question and a "give me everything about X" Max Recall question cost differently, but neither gets more expensive just because you've been journaling for ten years instead of one.
+
+Realistically, for one person's personal use, this comes out to somewhere between a few cents and a few dollars a month depending on how often you use it. You'll need to add a small amount of credit to an Anthropic API account to use it at all -- there's no free tier that avoids this step, but there's also no minimum spend or subscription; you're billed only for what you actually use.
+
+## Before you start: what you'll need
+
+- **A computer** (Windows or Mac) to run this on. It stays running only when you want to use it -- it's not a background service you have to leave on all the time (see [Keeping it up to date automatically](#keeping-it-up-to-date-automatically) if you do want that).
+- **A journal export** from Day One (or Diarium, with caveats) -- a JSON file. If you haven't exported one yet, that's covered in [Step 3](#step-3-export-your-journal) below.
+- **An Anthropic API key** -- a password-like string that lets this project make API calls on your behalf, billed to you directly. Getting one is covered in [Step 2](#step-2-run-the-setup-wizard) below; it takes about two minutes.
+- Optionally, if you want to use this from your phone too: **[Tailscale](https://tailscale.com)**, a free app that creates a private network between just your own devices. Covered in [Using it from your phone](#using-it-from-your-phone).
+
+You do **not** need to already know Python, or how to use a terminal, to get through setup -- the steps below are written assuming you don't.
+
+## Step 1: Download and open the folder
+
+Download this project (from GitHub: the green "Code" button, then "Download ZIP"; or however you received it), and unzip it somewhere you'll remember -- your Documents folder is a fine choice.
+
+Open that unzipped folder. You should see a file called **`start_setup.bat`** (Windows) or **`start_setup.command`** (Mac) sitting near the top, alongside files like `README.md` (this file) and `setup_wizard.py`.
+
+## Step 2: Run the setup wizard
+
+**Double-click `start_setup.bat`** (Windows) or **`start_setup.command`** (Mac).
+
+> **On a Mac**, the very first time you run it, you may see a security warning instead of it just running -- this is normal for any downloaded script, not specific to this project. Right-click (or Control-click) the file, choose **Open**, then click **Open** again in the dialog that appears. You only need to do this once; after that, double-clicking works normally.
+
+This opens a small black terminal window. Leave it open -- closing it stops the setup page. A couple of things happen automatically:
+
+- If Python isn't installed on your computer yet, it tells you and opens the download page for you. Install Python (on the very first screen of the Windows installer, **check the box that says "Add python.exe to PATH"** before clicking Install -- this step is easy to miss and matters), then double-click the launcher file again.
+- If Python is already there, it starts the setup page and opens it in your browser automatically, at `http://localhost:5050`. If your browser doesn't open on its own, just go to that address yourself.
+
+On that page:
+
+1. **(Optional) Click "Install packages."** This installs the two things the app needs (`chromadb` and `anthropic`) for you, with a live progress log right on the page. You can skip this if you'd rather install them yourself, or already have.
+2. **Get an API key.** Go to [console.anthropic.com](https://console.anthropic.com), sign up or sign in, and create a new API key (usually under Settings → API Keys). Add a small amount of credit to the account -- a few dollars covers a long time at personal-use volume (see [What this actually costs](#what-this-actually-costs) above). This is separate from any Claude.ai subscription; it's its own pay-per-use billing.
+3. **Paste that key into the "Anthropic API key" field** on the setup page.
+4. **Decide about tagging.** There's a checkbox for this, unchecked by default, with real cost numbers right next to it -- see [Tags and Max Recall, explained](#tags-and-max-recall-explained) below for what it does and why it's opt-in rather than automatic. Leaving it unchecked is completely fine; you can always turn it on later from this same page.
+5. **Set your journal export folder.** This is where you'll drop your export file(s) -- see [Step 3](#step-3-export-your-journal). The default (`./exports`, a folder right inside this project) is fine for most people. If that folder doesn't exist yet, click **"Create this folder"** right next to the field and it'll be made for you.
+6. Leave the "Advanced" section closed unless you have a specific reason to change where the database or tracking files live -- the defaults are fine.
+7. **Click Save.**
+
+That's it for this page. It writes everything into a file called `.env` inside this project folder -- more on exactly what that means and why it's safe in [Privacy and security](#privacy-and-security).
+
+## Step 3: Export your journal
+
+### Exporting from a computer
+
+**Day One (Mac/Windows app):** Journal Settings → Export Journal → choose **JSON** (check "include media" if you want photo search) → save the file into the export folder you set up in Step 2.
+
+**Diarium:** use Diarium's own JSON export option from its settings/backup menu, and save it into the same folder. See the [Known limitations](#known-limitations-please-read-this-section) section for what "best-effort support" means for Diarium specifically, before relying on this.
+
+### Exporting from a phone (iOS/Android)
+
+**Day One app:**
+
+1. Open Day One on your phone.
+2. Go to **Settings**.
+3. Tap **Import/Export**.
+4. Tap **Export**, then choose **JSON**.
+5. Wait for the export to finish -- Day One will show a notification when it's ready.
+6. Tap **Share**, then choose where to send it. If you've set up the synced-folder approach below, save it there directly; otherwise, save it to Files (iOS) or your Downloads (Android) and move it to your computer's export folder afterward (e.g. by AirDrop, email to yourself, or a cloud drive app).
+
+**Diarium app:** the exact menu wording varies by version, but look for an **Export** or **Backup** option in Diarium's settings, and choose the JSON format if offered (Diarium's primary backup format is a proprietary `.diary` file, not JSON -- make sure you're specifically choosing a JSON export, not the regular backup, since only JSON is what this project can read).
+
+### Keeping phone and computer in sync automatically
+
+If you journal from both your phone and your computer, exporting and manually moving the file every time gets old fast. The fix: pick **one cloud-synced folder** you already use anyway -- iCloud Drive, Dropbox, Google Drive, whatever -- and use that as your export destination on both devices. Point the "Journal export folder" field in the setup wizard at that folder's location on your computer.
+
+Once that's set up, exporting from either device (following the steps above, just choosing that synced folder as the save location) lands the file in the same place automatically, with no extra manual step to move it around.
+
+Day One doesn't support exporting just the entries since your last export -- only the whole journal, every time. That's fine here on purpose: this project remembers which entries it's already processed (by a checksum of their content, not by trusting file names or dates), so re-exporting your whole journal and re-running ingestion regularly is cheap and safe. Only entries that are actually new or edited get sent to the API and re-processed; nothing gets double-charged.
+
+## Step 4: Bring your journal in
+
+Once you've saved an export file into your export folder (Step 3), open a terminal in this project's folder and run:
 
 ```bash
-pip install chromadb anthropic flask
-# Optional: for visual/photo search (Phase 4+)
-pip install open-clip-torch pillow
+python ingest.py
 ```
 
-### 2. Get an Anthropic API key
+With no file name given, this automatically finds and processes every `.json`/`.zip` export sitting in your configured export folder -- which is exactly what you'll have after Step 3. (If you'd rather point it at one specific file directly, `python ingest.py path/to/your_export.json` works too.)
 
-Sign up at [console.anthropic.com](https://console.anthropic.com), create a key, and add a small amount of credit (a few dollars covers a long time at personal-use volume — this is separate from any Claude.ai subscription, it's pay-per-use API billing).
+This reads your entries, splits them into a local database, and extracts a short list of tags (people, places, themes) for each one -- which is what powers the "Max Recall" feature explained below. The very first run, on a full journal, can take a little while depending on how many entries you have; every run after that is much faster, since only new or changed entries get reprocessed.
 
-### 3. Configure the app
+**Not sure how to open a terminal in this folder?** On Windows, open the project folder in File Explorer, click into the address bar, type `cmd`, and press Enter. On Mac, open the project folder in Finder, then right-click (or Control-click) an empty spot inside it and choose "New Terminal at Folder" (or open Terminal normally and type `cd ` followed by dragging the folder in, then press Enter).
 
-**Easiest path — no code editing:**
+## Step 5: Start asking questions
 
-```bash
-python setup_wizard.py
-```
+You have two ways to ask questions: a full chat web page, or quick one-off questions from the terminal.
 
-Open [http://localhost:5050](http://localhost:5050), paste in your API key and (optionally) your export folder, and save. It writes a local `.env` file that everything else in this project reads automatically. This page only listens on your own computer (`127.0.0.1`) — it's never reachable from your phone or anywhere else on the network.
-
-**Or configure manually**, by setting environment variables yourself:
-
-```bash
-# Mac/Linux
-export ANTHROPIC_API_KEY="your-key-here"
-
-# Windows
-setx ANTHROPIC_API_KEY "your-key-here"
-# then reopen the terminal
-```
-
-Either approach works, and you can mix them — a real environment variable always takes priority over `.env`, so switching between the two later is safe.
-
-### 4. Export your journal
-
-**On your computer**: Day One → Journal Settings → Export Journal → JSON (include media if you want photo search). Save it to a folder you'll remember — see the tip below about using a synced folder if you also journal from your phone.
-
-**On your phone (iOS/Android)**: Day One → Settings → Import/Export → Export → JSON. Wait for the export notification, then Share → Save to Files (or your synced folder's app).
-
-**Tip — one folder for both**: if you use Day One on both your phone and computer, pick one cloud-synced folder (iCloud Drive, Dropbox, Google Drive — whatever you already use) as your drop point for exports, and point `JOURNAL_EXPORT_DIR` (or the setup wizard's export folder field) at its location on your computer. That one folder becomes the single hand-off point between Day One and this project — export from either device, and it lands in the same place automatically.
-
-Day One doesn't support exporting just the entries written since your last export — only the whole journal at once. That's fine here: `ingest.py` hashes each entry and only re-embeds (and re-pays-for) ones that are new or changed, so re-exporting and re-running ingestion regularly is cheap and safe, never a full re-processing.
-
-### 5. Ingest your journal
-
-```bash
-python ingest.py path/to/your_export.json
-```
-
-This embeds your entries into a local vector database (`chroma_db/`) and extracts tags (people/places/themes) for each one, which is what powers Max Recall. Only new or changed entries are re-embedded on subsequent runs.
-
-To force a full re-embed (e.g. after updating `ingest.py`):
-```bash
-python ingest.py path/to/your_export.json --force
-```
-
-### 6. Ask questions (command line)
-
-```bash
-python ask.py "What was going on with me last spring?"
-python ask.py "Detail my trip to California"
-python ask.py "What have I not reflected on in a while?"
-```
-
-### 7. Start the web app
+**The web app (recommended):**
 
 ```bash
 cd webapp
 python server.py
 ```
 
-Open [http://localhost:5000](http://localhost:5000) in your browser.
+Then open [http://localhost:5000](http://localhost:5000) in your browser. This is a proper chat interface, with conversation memory (you can say "tell me more about that" and it'll understand what "that" refers to), a mood chart, photo results, and the Max Recall toggle.
 
-## Phone access via Tailscale
+**From the terminal, for a quick one-off question:**
 
-1. Install [Tailscale](https://tailscale.com/download) on your computer and phone
-2. Sign in with the same account on both
-3. On your phone, open `http://<your-computer-tailscale-name>:5000`
-4. Tap Share → Add to Home Screen for a full-screen app icon
+```bash
+python ask.py "What was going on with me last spring?"
+python ask.py "Detail my trip to California"
+```
 
-## Automating ingestion
+## Using it from your phone
 
-**Mac/Linux (cron):**
+The web app above only listens on your own computer by default. To reach it from your phone too, without exposing it to the whole internet:
+
+1. Install [Tailscale](https://tailscale.com/download) on your computer and on your phone.
+2. Sign in with the same account on both.
+3. Make sure `python server.py` (from Step 5) is running on your computer.
+4. On your phone, open `http://<your-computer-tailscale-name>:5000` in a browser (Tailscale's app shows you this name).
+5. Tap Share → Add to Home Screen for a full-screen app icon, so it behaves like a normal app from then on.
+
+**Important:** there is no login or password on this app. Tailscale is what keeps it private -- it only makes the app reachable to your own signed-in devices, not the open internet. See [Privacy and security](#privacy-and-security) for what this means if you ever consider exposing it any other way (short version: don't port-forward it).
+
+## Keeping it up to date automatically
+
+Instead of manually running `ingest.py` every time you export, `watcher.py` can do it for you, plus start the web server automatically whenever it notices Chrome is open (handy if the browser tab is your main way of using this):
+
+```bash
+python watcher.py
+```
+
+Leave that running in a terminal window, and it checks for new exports in your export folder every 60 seconds, ingesting anything new automatically.
+
+If you'd rather this run on a proper schedule instead of needing a terminal window left open:
+
+**Mac (cron):**
 ```bash
 crontab -e
-# Add:
+# Add this line, then save and close:
 0 8 * * * cd /path/to/journal-rag && python3 ingest.py >> ingest.log 2>&1
 ```
 
-**Windows (Task Scheduler):**
-- Create Basic Task → Daily → run `python.exe` with argument `ingest.py`, Start In set to your project folder
+**Windows (Task Scheduler):** open Task Scheduler → Create Basic Task → Daily → have it run `python.exe` with the argument `ingest.py`, and set "Start In" to this project's folder.
 
-Once scheduled, this needs no manual attention — it quietly skips unchanged files and only processes what's new.
+Either way, this needs no ongoing attention once set up -- it quietly skips anything unchanged and only processes what's actually new.
 
-## Tagging and Max Recall
+## Tags and Max Recall, explained
 
-Every entry gets a short list of tags (notable people, places, themes) extracted automatically the first time it's ingested, using `TAG_EXTRACTION_MODEL` (Haiku by default — a cheaper, faster model than the one used for Q&A, since tagging doesn't need top-tier quality). These tags are what let Max Recall guarantee completeness: asking "everything about my trip to California" with Max Recall on retrieves *every* entry tagged with that topic, not just the ones that happen to rank highest in a similarity search.
+**Tagging is off by default.** It's a genuinely useful feature, but it's also a real (if small) API cost per entry, and on a first-time ingest of a large journal that adds up before you've had a chance to decide you actually want it -- so instead of turning it on automatically, the setup wizard asks you directly, with real cost numbers, and you choose. Nothing else about the app depends on tagging being on: asking questions, embeddings, and the mood chart all work exactly the same either way.
 
-**If some entries are missing tags** — because they were ingested before tagging existed, or a large first-time ingest got interrupted — catch them up with:
+**What tagging does, if you turn it on:** every entry gets a short list of tags -- notable people, places, and themes -- extracted the first time it's ingested, using a fast, inexpensive model (Haiku) separate from the one used to actually answer your questions.
+
+**What tagging enables:** normal questions use semantic search, finding the handful of entries that seem most relevant to what you asked, ranked by similarity. That's fast and usually right, but for a question like *"tell me everything about my trip to California,"* "most similar" isn't the same as "complete" -- there could be a relevant entry from months later that doesn't rank in the top handful, even though it's clearly about the same trip. **Max Recall** (the ⚡ toggle in the chat UI) fixes that for topic questions specifically: instead of a similarity ranking, it pulls out **every single entry tagged with that topic**, guaranteeing nothing gets missed. It costs a bit more per question too, since more context means more tokens sent to the API -- but for the specific kind of question where missing an entry actually matters, that trade-off is the whole point. Max Recall simply has nothing to pull from if tagging has never run, so it's unavailable (not broken, just empty) until tagging is on and at least one ingest has happened with it enabled.
+
+**Turning tagging on or off later:** re-run the setup wizard (`python setup_wizard.py`, or double-click the launcher) any time -- the checkbox reflects your current setting and changing it takes effect on your next `ingest.py` run. You can also flip it directly in `.env` (`ENABLE_TAGGING="true"` or `"false"`) or in `config.py` if you'd rather not use the wizard.
+
+**If some entries are missing tags** -- because tagging was off when they were first ingested and you've since turned it on, or a large first-time tagging run got interrupted partway through -- catch them up with:
 
 ```bash
 python tag_backfill.py --count        # see how many entries still need tags (free, no API calls)
@@ -124,56 +204,88 @@ python tag_backfill.py --limit 500    # tag up to 500 this run
 python tag_backfill.py --all          # tag everything that's left, in one go
 ```
 
-It's safe to interrupt (Ctrl+C) and safe to re-run — every batch is saved as it completes, and an entry Claude finds nothing notable in is remembered so it's never re-sent (and re-paid-for) on a later run.
+It's safe to interrupt with Ctrl+C and safe to re-run -- progress is saved as each batch completes, and an entry Claude finds nothing notable in is remembered so it's never re-sent (and re-charged for) on a later run.
 
-## Configuration
+## Photo search (optional)
 
-Edit `config.py` (or use `setup_wizard.py` for the basics) to adjust:
+If you export your journal with photos included, this project can find them two ways: by which entry they're attached to (works automatically, no setup), and by **what's actually in the photo** using an image-recognition model called CLIP -- so asking "show me the beach photo" can work even if you never actually wrote the word "beach" anywhere in that entry.
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `MAX_CONTEXT_CHUNKS` | 8 | Chunks per regular question |
-| `TREND_MAX_CONTEXT_CHUNKS` | 25 | Chunks for trend/pattern questions |
-| `SYNTHESIS_MAX_CONTEXT_CHUNKS` | 50 | Chunks for synthesis/action-item questions |
-| `MAX_POWER_CONTEXT_CHUNKS` | 200 | Ceiling for Max Recall's tag-matched retrieval |
-| `PHASE5_MAX_VISUAL_RESULTS` | 1 | Max ambient photos per non-photo question |
-| `PHASE5_VISUAL_THRESHOLD` | 0.30 | CLIP similarity cutoff for ambient photos |
-| `DIVERSITY_ENTRY_THRESHOLD` | 3 | When to apply diversity sampling |
-| `TAG_EXTRACTION_MODEL` | `claude-haiku-4-5` | Model used to tag entries at ingest time |
-| `TAG_BATCH_SIZE` | 15 | Entries tagged per API call (fewer round trips) |
+The second part -- visual/content-based photo search -- is optional and needs an extra, fairly large install (`open-clip-torch` and `pillow`; the former pulls in PyTorch, which alone can be a few hundred MB). You can install it from the setup wizard page (check "Also set up photo search" before clicking install) or manually:
+
+```bash
+pip install open-clip-torch pillow
+```
+
+Everything else in the app works completely fine without this -- you just won't get photos showing up for a question that doesn't otherwise reference them by name.
+
+## All the settings, explained
+
+Most people never need to touch these -- the defaults are reasonable. If you want to tune things, edit `config.py` directly (a plain text file, safe to open in any text editor):
+
+| Setting | Default | What it controls |
+|---------|---------|-------------------|
+| `MAX_CONTEXT_CHUNKS` | 8 | How many journal excerpts get pulled in per regular question. Higher = more thorough but more expensive. |
+| `TREND_MAX_CONTEXT_CHUNKS` | 25 | Used automatically for pattern/trend questions ("how have I been feeling lately") -- these need more spread-out context to answer well. |
+| `SYNTHESIS_MAX_CONTEXT_CHUNKS` | 50 | Used automatically for genuine synthesis questions ("summarize my meeting notes and give me action items"). |
+| `MAX_POWER_CONTEXT_CHUNKS` | 200 | A ceiling (not a target) on how much Max Recall's complete-topic retrieval can pull in one go. |
+| `TAG_EXTRACTION_MODEL` | Haiku | The model used to tag entries at ingest time. Cheap and fast on purpose -- point it at a different model if you want, but this doesn't need top-tier quality. |
+| `TAG_BATCH_SIZE` | 15 | How many entries get tagged per API call. Fewer round trips this way, especially useful on a big first-time ingest. |
+
+## Known limitations, please read this section
+
+This project is built and maintained by one person for personal use, and shared as-is. Here's exactly where it's solid, and where it isn't, so there are no surprises:
+
+- **Day One support is real and tested.** The JSON export format, the mobile export flow, and the whole pipeline have actually been built and run against real Day One exports.
+- **Diarium support is best-effort and unverified.** Diarium has no published schema for its JSON export anywhere -- not in their own documentation, not on their forums, and a third-party project that reverse-engineered Diarium's separate `.diary` backup format doesn't cover this export either. Diarium's own developer has confirmed the app can't even re-import its own JSON export, meaning there isn't even a strict format being maintained internally to match against. The code tries several plausible field-name variations rather than betting on one single guess, and fails with a detailed, specific error (showing you exactly what shape it found) rather than silently producing wrong answers if none of those guesses fit your actual export. If it doesn't work with your export, please open a GitHub issue with a small, redacted sample of the JSON structure (field names and shape only -- leave out your actual journal content) so support can be added for real.
+- **The generic fallback format** (for any other journal app that exports a flat list of date/text entries as JSON) is untested against any specific real app's export, for the same reason as Diarium -- there's no one format to test against. It should have a reasonable chance of working if your app's export is reasonably close to that shape, but "should" is doing real work in that sentence.
+- **Mac compatibility has been code-reviewed and tested in a Mac-like (POSIX/Linux) environment, but not run on an actual Mac.** The one genuinely Windows-specific piece found in the whole codebase (how `watcher.py` checks whether Chrome is running) has been fixed to work on both. Everything else already worked identically on both operating systems by nature of how Python handles file paths. If something doesn't work as expected on a real Mac, please open a GitHub issue.
+- **Photo search (the CLIP-based visual part) is a genuinely large optional install** -- see [Photo search](#photo-search-optional) above. Skip it if you don't need it; nothing else in the app is affected.
+- **There is no login or password on the web app.** Anyone who can reach the port it's running on can read your journal and ask it questions. This is fine used privately over Tailscale (see [Using it from your phone](#using-it-from-your-phone)) and not fine exposed to the open internet -- see [Privacy and security](#privacy-and-security) below.
+- **Real, small costs apply**, via the Anthropic API -- see [What this actually costs](#what-this-actually-costs) above for specifics. There's no way to use the tagging or question-answering features entirely for free, since those specifically require calling Claude.
+
+## Privacy and security
+
+Your journal stays on your computer. The only things that ever leave it are: the specific excerpts relevant to whatever question you just asked (sent to Anthropic's API to generate the answer), and short snippets of each entry at tagging time (sent the same way, to extract that entry's tags). Nothing else -- not your whole journal, not your photos in bulk, nothing -- is ever uploaded anywhere, by this project or by Anthropic's API on its own.
+
+**Your API key** is either stored in a local `.env` file (created by the setup wizard) or in your own computer's environment variables -- never hardcoded anywhere in the code, and never sent anywhere except as authentication when this project itself calls the Anthropic API on your behalf. The `.env` file is already excluded from git via `.gitignore`, so it can't end up on GitHub by accident if you ever push your own changes to a repo. If a key is ever accidentally exposed anyway, revoke it immediately at [console.anthropic.com](https://console.anthropic.com) and issue a new one -- there's no way to "undo" an exposed key otherwise.
+
+**Everything else sensitive** -- the vector database (`chroma_db/`), extracted photos (`photos/`), your raw export files, and the chat history log -- also lives only on your computer and is excluded from git the same way. No one else, including whoever built this project, ever has access to any of it. This isn't a hosted service; there's no server anywhere except the one running on your own machine.
+
+**On network exposure specifically:** the setup wizard (`setup_wizard.py`) only ever listens on `127.0.0.1` -- your own computer -- and is never reachable from your phone or any other device, even over Tailscale, since it's the one page that handles your raw API key. The main chat app (`webapp/server.py`) does listen more broadly (`0.0.0.0:5000`) specifically so it's reachable from your phone over Tailscale -- but again, it has no login of its own, so treat that port the way you'd treat a door with no lock: fine on a private network you control (Tailscale), risky on shared/public Wi-Fi without Tailscale, and something you should never expose to the open internet by port-forwarding it on your router.
+
+Full details live in [SECURITY.md](SECURITY.md).
+
+## If something goes wrong
+
+- **The setup wizard's browser tab shows an error, or never opens:** go to `http://localhost:5050` manually. If that also fails, check the terminal window the launcher opened -- the actual error is usually printed there.
+- **`python` isn't recognized / command not found:** Python isn't installed, or wasn't added to your system's PATH during install. Re-run the installer from [python.org](https://www.python.org/downloads/) and, on Windows, make sure "Add python.exe to PATH" is checked.
+- **Ingestion fails with an "Unrecognized export format" error:** your export's JSON structure doesn't match any of the supported shapes. The error message itself will show you what structure was actually found -- see [Known limitations](#known-limitations-please-read-this-section) above, especially if you're using Diarium or another app.
+- **Nothing else on this list matches your problem:** open a GitHub issue on this project's repository, including the exact error message and what you were trying to do. Please leave out your actual journal content, your API key, and any real names/locations from anything you paste in.
 
 ## Project structure
 
 ```
 journal-rag/
-├── ask.py                 # Question routing + retrieval logic
-├── ingest.py               # Embeds journal entries into ChromaDB, extracts tags
-├── tag_backfill.py         # Catches up entries missing tags, in resumable batches
-├── setup_wizard.py         # Local web form for API key + path configuration
-├── config.py               # All settings in one place
-├── image_embed.py          # CLIP-based photo embeddings (Phase 4+)
-├── watcher.py               # Optional: auto-start server when Chrome opens
+├── start_setup.bat          # Windows: double-click this first
+├── start_setup.command      # Mac: double-click this first
+├── setup_wizard.py          # The setup page these launchers open
+├── ask.py                   # Question routing + retrieval logic
+├── ingest.py                 # Reads journal exports into the local database, extracts tags
+├── tag_backfill.py           # Catches up entries missing tags, in resumable batches
+├── config.py                 # All settings in one place
+├── watcher.py                 # Optional: auto-ingest new exports + auto-start the server
 ├── webapp/
-│   ├── server.py           # Flask web server
+│   ├── server.py             # The chat web app's server
 │   └── templates/
-│       └── index.html      # Chat UI
-├── .env                     # Your API key + paths (created by setup_wizard.py, gitignored)
-├── .gitignore               # Keeps your journal data and secrets out of git
-├── LICENSE                  # MIT
-└── SECURITY.md              # How your data and API key are handled
+│       └── index.html        # The chat UI itself
+├── tests/
+│   └── test_normalize_entries.py   # Automated tests for the export-format parsing
+├── .env                       # Your API key + paths (created by setup_wizard.py, gitignored)
+├── .gitignore                 # Keeps your journal data and secrets out of git
+├── LICENSE                    # MIT
+└── SECURITY.md                # Full details on data handling and network exposure
 ```
-
-## Cost
-
-- **Embeddings**: free (local model, no API calls)
-- **Ingestion**: free unless you set `USE_HOSTED_EMBEDDINGS = True`
-- **Tagging**: a small fraction of a cent per entry with the default Haiku model — see `tag_backfill.py` above for catching up existing entries
-- **Questions**: ~$0.001–0.004 per question via the Anthropic API (scales with context chunks, not journal size; Max Recall questions cost more since they pull more context on purpose)
-
-## Privacy & security
-
-Your journal stays on your machine. Only the specific excerpts relevant to each question (or entry, for tagging) are sent to the Anthropic API. The `chroma_db/`, `photos/`, export folders, chat history, and your `.env` file are all excluded from git via `.gitignore`. See [SECURITY.md](SECURITY.md) for details on API key handling and safe network exposure (e.g. why the web app binds to `0.0.0.0` and what that means if you use it without Tailscale).
 
 ## License
 
-[MIT](LICENSE) — do what you like with it.
+[MIT](LICENSE) -- do what you like with it.

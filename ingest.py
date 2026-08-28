@@ -325,6 +325,17 @@ def extract_photo_filename(entry):
     return None
 
 
+def _first_present(d, keys, default=""):
+    """Returns the first non-empty value found across several possible key
+    names, tried in order. Used below wherever a field's exact name isn't
+    something we could pin down for certain (see the Diarium note)."""
+    for k in keys:
+        v = d.get(k)
+        if v:
+            return v
+    return default
+
+
 def normalize_entries(raw_data):
     """
     Best-effort normalization across export formats.
@@ -333,7 +344,26 @@ def normalize_entries(raw_data):
     entries = []
 
     # Day One export format: {"entries": [{"uuid": ..., "text": ..., "creationDate": ...}]}
-    if isinstance(raw_data, dict) and "entries" in raw_data:
+    # This one IS verified -- built and tested against real Day One exports.
+    #
+    # Checking for a top-level "entries" key alone isn't enough: some other
+    # apps' exports (including one plausible Diarium shape) also use
+    # "entries" as their container name, which would otherwise get
+    # misrouted into this branch and silently produce garbage (Day One's
+    # parsing expects "uuid"/"creationDate", fields those other formats
+    # don't have). Day One's own export is the only one of the supported
+    # formats that puts a "uuid" field on each entry, so checking for that
+    # too is what actually tells this apart from a same-named-but-different
+    # export. An empty "entries" list has nothing to check, so it's let
+    # through as Day One too -- there's nothing there to be wrong about.
+    day_one_entries = raw_data.get("entries") if isinstance(raw_data, dict) else None
+    looks_like_day_one = (
+        isinstance(day_one_entries, list)
+        and (not day_one_entries or (
+            isinstance(day_one_entries[0], dict) and "uuid" in day_one_entries[0]
+        ))
+    )
+    if looks_like_day_one:
         for e in raw_data["entries"]:
             # creationDate is the entry's actual date (Day One lets you
             # manually correct this if you post late, so it's trustworthy).
@@ -350,29 +380,83 @@ def normalize_entries(raw_data):
             })
         return entries
 
-    # Diarium JSON export: often a flat list or {"Entries": [...]}
-    if isinstance(raw_data, dict) and "Entries" in raw_data:
-        for e in raw_data["Entries"]:
+    # Diarium JSON export: BEST-EFFORT AND UNVERIFIED. Diarium has no
+    # published schema for this format (checked their forums, docs, and a
+    # third-party decoder of their separate .diary backup format -- none
+    # document the JSON export specifically; the developer has confirmed
+    # Diarium can't even re-import its own export, so there's no strict
+    # round-trip format being maintained internally either). This tries
+    # several plausible container/field names rather than betting on one
+    # guess -- if none of them fit your actual export, you'll land in the
+    # helpful error at the bottom, not a silent wrong answer.
+    diarium_container = None
+    for key in ("Entries", "entries", "DiaryEntries", "diaryEntries"):
+        if isinstance(raw_data, dict) and isinstance(raw_data.get(key), list):
+            diarium_container = raw_data[key]
+            break
+    if diarium_container is not None:
+        for e in diarium_container:
+            if not isinstance(e, dict):
+                # A container key matched by name, but its items aren't
+                # objects (e.g. a plain list of strings) -- not actually a
+                # Diarium export, just a same-named coincidence. Skip
+                # rather than crash; if EVERY item is like this, entries
+                # stays empty and normalize_entries still returns
+                # cleanly (an empty list, not an error) rather than
+                # forcing this all the way down to the generic-format
+                # error message below, which would be a confusing thing
+                # to see for what's actually just an empty/junk export.
+                continue
             entries.append({
-                "id": e.get("Id") or e.get("Date"),
-                "date": e.get("Date", ""),
-                "text": (e.get("Text") or e.get("Content") or "").strip(),
+                "id": _first_present(e, ("Id", "id", "ID", "Date", "date")),
+                "date": _first_present(e, ("Date", "date", "EntryDate", "Timestamp", "timestamp")),
+                "text": _first_present(e, ("Text", "text", "Content", "content", "Body", "body")).strip()
+                        if isinstance(_first_present(e, ("Text", "text", "Content", "content", "Body", "body")), str)
+                        else "",
                 "photo": None,
             })
         return entries
 
-    # Generic fallback: flat list of {"date"/"text"} or similar
+    # Generic fallback: flat list of {"date"/"text"} or similar -- tries a
+    # broader set of common field-name variants for the same reason as
+    # the Diarium branch above, since this is what any other journal
+    # app's export ends up going through.
     if isinstance(raw_data, list):
         for e in raw_data:
+            if not isinstance(e, dict):
+                continue
+            text_val = _first_present(e, ("text", "Text", "content", "Content", "body", "Body"))
             entries.append({
-                "id": e.get("id") or e.get("date"),
-                "date": e.get("date", ""),
-                "text": (e.get("text") or e.get("content") or "").strip(),
+                "id": _first_present(e, ("id", "Id", "ID", "date", "Date")),
+                "date": _first_present(e, ("date", "Date", "timestamp", "Timestamp")),
+                "text": text_val.strip() if isinstance(text_val, str) else "",
                 "photo": None,
             })
         return entries
 
-    raise ValueError("Unrecognized export format -- check the JSON structure.")
+    # Nothing matched -- fail with enough detail that you (or a GitHub
+    # issue, or an AI assistant helping you debug) can actually diagnose
+    # it, instead of a bare "unrecognized format".
+    if isinstance(raw_data, dict):
+        shape_hint = f"a JSON object with top-level keys: {sorted(raw_data.keys())}"
+    elif isinstance(raw_data, list):
+        shape_hint = (
+            f"a JSON list of {len(raw_data)} items, where the first item "
+            f"looks like: {raw_data[0] if raw_data else '(empty list)'}"
+        )
+    else:
+        shape_hint = f"a top-level JSON value of type {type(raw_data).__name__}"
+    raise ValueError(
+        "Unrecognized export format -- none of the known shapes (Day One, "
+        "Diarium's best-effort guess, or a generic date/text list) matched. "
+        f"Your file looks like: {shape_hint}\n\n"
+        "This usually means either the file isn't a journal export, or "
+        "it's from an app/format this project hasn't seen before. If you'd "
+        "like support added for it, please open a GitHub issue with a "
+        "small sample of the JSON structure (with any real names/locations/"
+        "personal text redacted or replaced -- just the field names and "
+        "shape matter, not your actual content)."
+    )
 
 
 def chunk_text(text, size=None, overlap=None):
@@ -502,17 +586,32 @@ def ingest_file(filepath, collection, processed_log, entry_photo_map=None):
     # for why this is batched instead of one call per entry. Runs BEFORE
     # the chunk-building loop below since tags are per-entry, not per-chunk,
     # and every chunk of an entry shares the same tag string.
+    #
+    # Gated on ENABLE_TAGGING (off by default -- see config.py): this is a
+    # real API cost, and on a first ingest of a large journal it's one
+    # that adds up before you've decided you want it. With tagging off,
+    # this whole block -- and its API calls -- is skipped entirely; the
+    # entry just gets no tags this run. Everything else about the journal
+    # (asking it questions, embeddings, sentiment) still works completely
+    # normally, just without Max Recall's completeness guarantee until
+    # tagging is turned on and tag_backfill.py catches existing entries up.
     entry_tags = {}
-    tag_batch = []
-    tagging_client = get_tagging_client()
-    for e, h in new_or_changed:
-        if e["text"]:
-            tag_batch.append((str(e["id"]), e["text"]))
-        if len(tag_batch) >= config.TAG_BATCH_SIZE:
+    if config.ENABLE_TAGGING:
+        tag_batch = []
+        tagging_client = get_tagging_client()
+        for e, h in new_or_changed:
+            if e["text"]:
+                tag_batch.append((str(e["id"]), e["text"]))
+            if len(tag_batch) >= config.TAG_BATCH_SIZE:
+                entry_tags.update(extract_tags_batch(tag_batch, tagging_client))
+                tag_batch = []
+        if tag_batch:
             entry_tags.update(extract_tags_batch(tag_batch, tagging_client))
-            tag_batch = []
-    if tag_batch:
-        entry_tags.update(extract_tags_batch(tag_batch, tagging_client))
+    else:
+        print(f"[{filepath}] Tagging is off (ENABLE_TAGGING not set) -- "
+              f"skipping tag extraction for {len(new_or_changed)} entries. "
+              f"Everything else still works; turn tagging on in the setup "
+              f"wizard (or config.py) if you want Max Recall.")
 
     ids, docs, metadatas = [], [], []
     for e, h in new_or_changed:
