@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ask Your Journal</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#FAF6EE">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Journal">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --parchment: #FAF6EE;
+    --parchment-line: #E8E1D2;
+    --ink: #232C3D;
+    --ink-soft: #4A5568;
+    --sage: #7C9070;
+    --sage-deep: #5E7052;
+    --warm-grey: #8B8478;
+    --user-bubble: #232C3D;
+    --user-bubble-text: #FAF6EE;
+    --field-surface: #FFFFFF;
+    --send-icon: #FFFFFF;
+  }
+
+  [data-theme="dark"] {
+    --parchment: #1C1A16;
+    --parchment-line: #33302A;
+    --ink: #EDE6D6;
+    --ink-soft: #C4BCA9;
+    --sage: #8FAB80;
+    --sage-deep: #A3C293;
+    --warm-grey: #8C8574;
+    --user-bubble: #EDE6D6;
+    --user-bubble-text: #1C1A16;
+    --field-surface: #2A2721;
+    --send-icon: #1C1A16;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--parchment);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, sans-serif;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    padding: 18px 20px 14px;
+    padding-top: max(18px, env(safe-area-inset-top));
+    border-bottom: 1px solid var(--parchment-line);
+    background: var(--parchment);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'Source Serif 4', serif;
+    font-weight: 600;
+    font-size: 19px;
+    margin: 0;
+    letter-spacing: 0.01em;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--parchment-line);
+    color: var(--ink);
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background 0.15s;
+  }
+
+  .icon-btn:hover {
+    background: var(--parchment-line);
+  }
+
+  header .status {
+    font-size: 12px;
+    color: var(--warm-grey);
+    font-variant-numeric: tabular-nums;
+  }
+
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 35px,
+      var(--parchment-line) 35px,
+      var(--parchment-line) 36px
+    );
+    background-attachment: local;
+  }
+
+  .empty-state {
+    margin: auto;
+    text-align: center;
+    color: var(--warm-grey);
+    max-width: 280px;
+    background: var(--parchment);
+    padding: 8px 16px;
+  }
+
+  .empty-state .mark {
+    font-family: 'Caveat', cursive;
+    font-weight: 600;
+    font-size: 22px;
+    color: var(--sage-deep);
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .empty-state p {
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .row {
+    display: flex;
+    flex-direction: column;
+    max-width: 82%;
+  }
+
+  .row.user { align-self: flex-end; align-items: flex-end; }
+  .row.journal { align-self: flex-start; align-items: flex-start; }
+
+  .datestamp {
+    font-family: 'Source Serif 4', serif;
+    font-style: italic;
+    font-size: 11px;
+    color: var(--sage-deep);
+    margin-bottom: 4px;
+    padding: 0 4px;
+  }
+
+  .bubble {
+    padding: 11px 15px;
+    border-radius: 4px;
+    line-height: 1.5;
+    font-size: 14.5px;
+    background: var(--parchment);
+  }
+
+  .row.user .bubble {
+    background: var(--user-bubble);
+    color: var(--user-bubble-text);
+    border-radius: 14px 14px 3px 14px;
+  }
+
+  .row.journal .bubble {
+    font-family: 'Caveat', cursive;
+    font-weight: 500;
+    font-size: 20px;
+    line-height: 1.4;
+    color: var(--ink);
+    border-left: 2px solid var(--sage);
+    padding-left: 14px;
+    background: transparent;
+  }
+
+  .answer-line {
+    display: block;
+  }
+
+  .answer-line:empty {
+    height: 0.6em;
+  }
+
+  .sources {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--warm-grey);
+    padding: 0 4px;
+  }
+
+  /* Modal shell shared by the mood-over-time chart (see .mood-modal below) */
+  .entry-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(35, 44, 61, 0.55);
+    z-index: 200;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    animation: fadeIn 0.15s ease;
+  }
+
+  .entry-modal-overlay[hidden] { display: none; }
+
+  .entry-modal {
+    background: var(--parchment);
+    border-radius: 18px 18px 0 0;
+    width: 100%;
+    max-width: 640px;
+    max-height: 82dvh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -4px 24px rgba(35,44,61,0.18);
+    animation: slideUp 0.2s ease;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(40px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .entry-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--parchment-line);
+    flex-shrink: 0;
+  }
+
+  .entry-modal-date {
+    font-family: 'Source Serif 4', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--sage-deep);
+  }
+
+  .entry-modal-close {
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    color: var(--warm-grey);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    line-height: 1;
+  }
+
+  .entry-modal-close:hover { background: var(--parchment-line); }
+
+  .entry-modal-body {
+    overflow-y: auto;
+    padding: 18px 20px 32px;
+    flex: 1;
+  }
+
+  .entry-modal-loading {
+    text-align: center;
+    padding: 32px;
+    color: var(--warm-grey);
+    font-size: 14px;
+  }
+
+  /* Mood chart -- reuses the entry-modal shell, just wider on desktop */
+  .mood-modal {
+    max-width: 680px;
+  }
+
+  .mood-chart-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .mood-chart-wrap svg {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .mood-bar {
+    transition: opacity 0.15s;
+  }
+
+  .mood-bar:hover {
+    opacity: 0.75;
+  }
+
+  .mood-month-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    fill: var(--warm-grey);
+  }
+
+  .mood-zero-line {
+    stroke: var(--parchment-line);
+    stroke-width: 1;
+  }
+
+  .mood-legend {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: var(--warm-grey);
+    padding: 0 2px;
+  }
+
+  .mood-tooltip {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    fill: var(--ink);
+  }
+
+  .mood-empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--warm-grey);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* "View entry" link that appears under each cited excerpt line */
+  .expand-entry-btn {
+    display: inline-block;
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--sage-deep);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    opacity: 0.75;
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+  }
+  .expand-entry-btn:hover { opacity: 1; }
+
+  /* Entry carousel -- full-screen viewer for every entry cited in one
+     answer. Opened by an "View entry" button under an excerpt line;
+     pages through every entry in that answer's sources, in order. */
+  .carousel-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 22, 18, 0.88);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    padding-top: max(20px, env(safe-area-inset-top));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    animation: fadeIn 0.15s ease;
+  }
+
+  .carousel-overlay[hidden] { display: none; }
+
+  .carousel-frame {
+    position: relative;
+    background: var(--parchment);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    animation: slideUp 0.2s ease;
+  }
+
+  .carousel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 44px 10px 16px;
+    border-bottom: 1px solid var(--parchment-line);
+    flex-shrink: 0;
+  }
+
+  .carousel-date {
+    font-family: 'Source Serif 4', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--sage-deep);
+  }
+
+  .carousel-counter {
+    font-size: 11px;
+    color: var(--warm-grey);
+    font-variant-numeric: tabular-nums;
+    margin-left: auto;
+  }
+
+  .carousel-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    color: var(--warm-grey);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+    line-height: 1;
+  }
+  .carousel-close:hover { background: var(--parchment-line); }
+
+  .carousel-body {
+    overflow-y: auto;
+    padding: 18px 20px 32px;
+    flex: 1;
+  }
+
+  .carousel-photo {
+    width: 100%;
+    max-height: 280px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    border: 1px solid var(--parchment-line);
+    cursor: pointer;
+  }
+
+  .carousel-text {
+    font-family: 'Caveat', cursive;
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--ink);
+    white-space: pre-wrap;
+  }
+
+  .carousel-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(35, 44, 61, 0.6);
+    color: #fff;
+    border: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .carousel-nav:hover { background: rgba(35, 44, 61, 0.8); }
+  .carousel-nav:disabled { opacity: 0.25; cursor: default; }
+  .carousel-prev { left: 10px; }
+  .carousel-next { right: 10px; }
+
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 22, 18, 0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 24px;
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+
+  .lightbox[hidden] {
+    display: none;
+  }
+
+  .lightbox img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  #lightbox-close {
+    position: absolute;
+    top: max(16px, env(safe-area-inset-top));
+    right: 16px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .error-bubble .bubble {
+    color: #9B4444;
+    border-left-color: #C77;
+  }
+
+  .thinking {
+    align-self: flex-start;
+    color: var(--warm-grey);
+    font-family: 'Source Serif 4', serif;
+    font-style: italic;
+    font-size: 13.5px;
+    padding: 0 4px;
+  }
+
+  .thinking .dots span {
+    animation: blink 1.4s infinite both;
+    animation-delay: calc(var(--i) * 0.2s);
+  }
+  .thinking .dots span:nth-child(1) { --i: 0; }
+  .thinking .dots span:nth-child(2) { --i: 1; }
+  .thinking .dots span:nth-child(3) { --i: 2; }
+
+  @keyframes blink {
+    0%, 80%, 100% { opacity: 0.25; }
+    40% { opacity: 1; }
+  }
+
+  form#composer {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--parchment-line);
+    background: var(--parchment);
+    flex-shrink: 0;
+  }
+
+  #question {
+    flex: 1;
+    border: 1px solid var(--parchment-line);
+    background: var(--field-surface);
+    border-radius: 20px;
+    padding: 11px 16px;
+    font-size: 15px;
+    font-family: 'Inter', sans-serif;
+    color: var(--ink);
+    outline: none;
+    resize: none;
+    max-height: 100px;
+  }
+
+  #question:focus {
+    border-color: var(--sage);
+    box-shadow: 0 0 0 3px rgba(124, 144, 112, 0.15);
+  }
+
+  button#send {
+    background: var(--sage-deep);
+    color: var(--send-icon);
+    border: none;
+    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, opacity 0.15s;
+  }
+
+  button#send:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  button#send:not(:disabled):active {
+    background: var(--sage);
+  }
+
+  button.max-recall-btn {
+    background: var(--field-surface);
+    color: var(--ink);
+    border: 1px solid var(--parchment-line);
+    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.55;
+    transition: background 0.15s, opacity 0.15s, border-color 0.15s;
+  }
+
+  button.max-recall-btn.active {
+    background: var(--sage-deep);
+    color: var(--send-icon);
+    border-color: var(--sage-deep);
+    opacity: 1;
+  }
+
+  button.max-recall-btn:hover {
+    opacity: 0.85;
+  }
+
+  button.max-recall-btn.active:hover {
+    opacity: 1;
+  }
+
+  .matched-tag-note {
+    font-size: 12px;
+    color: var(--sage-deep);
+    padding: 2px 0 4px;
+    font-style: italic;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .thinking .dots span { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Your Journal</h1>
+  <div class="header-right">
+    <button id="mood-toggle" class="icon-btn" title="Mood over time" aria-label="Show mood chart">&#9711;</button>
+    <button id="theme-toggle" class="icon-btn" title="Toggle dark mode" aria-label="Toggle dark mode">&#9789;</button>
+    <span class="status" id="status"></span>
+  </div>
+</header>
+
+<div id="chat">
+  <div class="empty-state" id="empty-state">
+    <span class="mark">&ldquo;Ask, and it shall be found.&rdquo;</span>
+    <p>Ask anything about your past entries &mdash; a season, a feeling, a decision you made.</p>
+  </div>
+</div>
+
+<div id="lightbox" class="lightbox" hidden>
+  <button id="lightbox-close" aria-label="Close">&times;</button>
+  <img id="lightbox-img" src="" alt="Expanded journal photo">
+</div>
+
+<!-- Entry carousel: full-screen view of every entry cited in an answer.
+     Opened by the "View entry" button under an excerpt line; the < >
+     buttons and left/right arrow keys page through every entry in that
+     answer's sources array, built straight from the backend response
+     (no text/date matching involved). -->
+<div id="carousel-overlay" class="carousel-overlay" hidden>
+  <div class="carousel-frame" role="dialog" aria-modal="true" aria-label="Journal entry">
+    <div class="carousel-header">
+      <span class="carousel-date" id="carousel-date"></span>
+      <span class="carousel-counter" id="carousel-counter"></span>
+      <button class="carousel-close" id="carousel-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="carousel-body" id="carousel-body">
+      <div class="entry-modal-loading">Loading entry…</div>
+    </div>
+    <button class="carousel-nav carousel-prev" id="carousel-prev" aria-label="Previous entry">&#8249;</button>
+    <button class="carousel-nav carousel-next" id="carousel-next" aria-label="Next entry">&#8250;</button>
+  </div>
+</div>
+
+<!-- Mood-over-time chart modal -->
+<div id="mood-modal-overlay" class="entry-modal-overlay" hidden>
+  <div class="entry-modal mood-modal" role="dialog" aria-modal="true" aria-label="Mood over time">
+    <div class="entry-modal-header">
+      <span class="entry-modal-date">Mood over time</span>
+      <button class="entry-modal-close" id="mood-modal-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="entry-modal-body" id="mood-modal-body">
+      <div class="entry-modal-loading">Loading mood data…</div>
+    </div>
+  </div>
+</div>
+
+<form id="composer" autocomplete="off">
+  <textarea id="question" rows="1" placeholder="Ask your journal something..." required></textarea>
+  <button id="max-recall-toggle" type="button" class="max-recall-btn" aria-pressed="false"
+          title="Max Recall: pulls EVERY tagged entry for topic questions (e.g. &quot;everything about my NAMI volunteering&quot;), not just the closest few matches">&#9889;</button>
+  <button id="send" type="submit" aria-label="Send">&#8593;</button>
+</form>
+<script>
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightbox-img');
+const lightboxClose = document.getElementById('lightbox-close');
+
+function openLightbox(src) {
+  lightboxImg.src = src;
+  lightbox.hidden = false;
+}
+
+function closeLightbox() {
+  lightbox.hidden = true;
+  lightboxImg.src = '';
+}
+
+lightboxClose.addEventListener('click', closeLightbox);
+lightbox.addEventListener('click', (e) => {
+  if (e.target === lightbox) closeLightbox();  // click outside the image
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !lightbox.hidden) closeLightbox();
+});
+
+const themeToggle = document.getElementById('theme-toggle');
+const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+let currentTheme = prefersDark ? 'dark' : 'light';
+
+function applyTheme(theme) {
+  currentTheme = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  themeToggle.innerHTML = theme === 'dark' ? '&#9728;' : '&#9789;';
+}
+
+themeToggle.addEventListener('click', () => {
+  applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+});
+
+applyTheme(currentTheme);
+
+const chat = document.getElementById('chat');
+const form = document.getElementById('composer');
+const input = document.getElementById('question');
+const sendBtn = document.getElementById('send');
+const emptyState = document.getElementById('empty-state');
+const statusEl = document.getElementById('status');
+const maxRecallToggle = document.getElementById('max-recall-toggle');
+
+// "Max Recall" toggle: off by default, remembered across visits via
+// localStorage (this is a real local webapp running in the user's own
+// browser, not a hosted preview -- so persisting it there is appropriate
+// and is what makes the toggle feel "sticky" instead of resetting on
+// every page load).
+let maxRecallOn = false;
+try {
+  maxRecallOn = localStorage.getItem('maxRecallOn') === 'true';
+} catch (e) {
+  // localStorage unavailable for some reason -- just default to off.
+}
+
+function applyMaxRecallState() {
+  maxRecallToggle.classList.toggle('active', maxRecallOn);
+  maxRecallToggle.setAttribute('aria-pressed', String(maxRecallOn));
+  maxRecallToggle.title = maxRecallOn
+    ? 'Max Recall: ON — pulls EVERY tagged entry for topic questions, not just the closest few matches. Click to turn off.'
+    : 'Max Recall: OFF — click to pull EVERY tagged entry for topic questions (e.g. "everything about my NAMI volunteering")';
+}
+
+maxRecallToggle.addEventListener('click', () => {
+  maxRecallOn = !maxRecallOn;
+  try {
+    localStorage.setItem('maxRecallOn', String(maxRecallOn));
+  } catch (e) {
+    // Ignore -- toggle still works for the rest of this page session.
+  }
+  applyMaxRecallState();
+});
+
+applyMaxRecallState();
+
+function today() {
+  return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Answers arrive as plain text with <br> line breaks (see escapeHtml +
+// replace(/\n/g, '<br>') at the call site), not <li>/<p> elements. Every
+// answer gets split into one .answer-line div per line -- unconditionally,
+// regardless of whether it has sources/photos -- so attachExpandButtons()
+// below always has an addressable element per line to attach a button to.
+function splitIntoAnswerLines(bubble, htmlAnswer) {
+  const lines = htmlAnswer.split(/<br\s*\/?>/i);
+  bubble.innerHTML = '';
+  for (const line of lines) {
+    const lineEl = document.createElement('div');
+    lineEl.className = 'answer-line';
+    lineEl.innerHTML = line;
+    bubble.appendChild(lineEl);
+  }
+}
+
+function addRow(role, html, meta) {
+  if (emptyState) emptyState.remove();
+  const row = document.createElement('div');
+  row.className = 'row ' + role + (meta && meta.error ? ' error-bubble' : '');
+
+  const sources = (meta && meta.sources) || [];
+
+  const stamp = document.createElement('div');
+  stamp.className = 'datestamp';
+  stamp.textContent = role === 'user' ? 'You · ' + today() : 'Your journal';
+  row.appendChild(stamp);
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  splitIntoAnswerLines(bubble, html);
+  row.appendChild(bubble);
+
+  if (meta && meta.matchedTag) {
+    const note = document.createElement('div');
+    note.className = 'matched-tag-note';
+    note.textContent = '\ud83d\udcda Max Recall: every entry tagged "' + meta.matchedTag + '" (' + sources.length + ')';
+    row.appendChild(note);
+  }
+
+  if (sources.length) {
+    const src = document.createElement('div');
+    src.className = 'sources';
+    const dates = [...new Set(sources.map(s => s.date))].slice(0, 4);
+    src.textContent = 'From: ' + dates.join(', ');
+    row.appendChild(src);
+  }
+
+  chat.appendChild(row);
+  chat.scrollTop = chat.scrollHeight;
+
+  // Attach "View entry" buttons to any answer lines whose date has
+  // a known entry_id -- only relevant for journal (not user) rows.
+  if (role === 'journal' && sources.length) {
+    attachExpandButtons(row, sources);
+  }
+
+  return row;
+}
+
+function addThinking() {
+  const el = document.createElement('div');
+  el.className = 'thinking';
+  el.innerHTML = 'Reading your entries<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+  return el;
+}
+
+async function refreshStatus() {
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    statusEl.textContent = data.entry_chunks + ' passages indexed';
+  } catch (e) {
+    statusEl.textContent = '';
+  }
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch('/api/history');
+    const data = await res.json();
+    if (data.history && data.history.length) {
+      for (const item of data.history) {
+        addRow('user', escapeHtml(item.question));
+        addRow('journal', escapeHtml(item.answer).replace(/\n/g, '<br>'), { sources: item.sources });
+      }
+    }
+  } catch (e) {
+    // Quietly ignore -- history is a nice-to-have, not critical path.
+  }
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const question = input.value.trim();
+  if (!question) return;
+
+  addRow('user', escapeHtml(question));
+  input.value = '';
+  input.style.height = 'auto';
+  sendBtn.disabled = true;
+  const thinkingEl = addThinking();
+
+  try {
+    const res = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, max_recall: maxRecallOn })
+    });
+    const data = await res.json();
+    thinkingEl.remove();
+
+    if (!res.ok) {
+      addRow('journal', escapeHtml(data.error || 'Something went wrong.'), { error: true });
+    } else {
+      addRow('journal', escapeHtml(data.answer).replace(/\n/g, '<br>'), { sources: data.sources, matchedTag: data.matched_tag });
+    }
+  } catch (err) {
+    thinkingEl.remove();
+    addRow('journal', 'Could not reach the server. Is it still running?', { error: true });
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+});
+
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+});
+
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    form.requestSubmit();
+  }
+});
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+refreshStatus();
+loadHistory();
+
+// --- Entry carousel ---
+// Pages through every entry cited in one answer, built directly from that
+// answer's `sources` array (deduped by entry_id) -- not by re-matching
+// dates against rendered text. Opened by a "View entry" button placed
+// under whichever excerpt line the source date belongs to.
+const carouselOverlay = document.getElementById('carousel-overlay');
+const carouselDate    = document.getElementById('carousel-date');
+const carouselCounter = document.getElementById('carousel-counter');
+const carouselBody    = document.getElementById('carousel-body');
+const carouselClose   = document.getElementById('carousel-close');
+const carouselPrev    = document.getElementById('carousel-prev');
+const carouselNext    = document.getElementById('carousel-next');
+
+let carouselEntries = [];
+let carouselIndex = 0;
+const entryCache = new Map(); // entry_id -> {date, photo, text} | 'error'
+
+function closeCarousel() {
+  carouselOverlay.hidden = true;
+  carouselEntries = [];
+  carouselIndex = 0;
+}
+
+carouselClose.addEventListener('click', closeCarousel);
+carouselOverlay.addEventListener('click', (e) => {
+  if (e.target === carouselOverlay) closeCarousel();
+});
+carouselPrev.addEventListener('click', () => stepCarousel(-1));
+carouselNext.addEventListener('click', () => stepCarousel(1));
+
+document.addEventListener('keydown', (e) => {
+  if (carouselOverlay.hidden) return;
+  if (e.key === 'Escape') closeCarousel();
+  else if (e.key === 'ArrowLeft') stepCarousel(-1);
+  else if (e.key === 'ArrowRight') stepCarousel(1);
+});
+
+function stepCarousel(delta) {
+  const next = carouselIndex + delta;
+  if (next < 0 || next >= carouselEntries.length) return;
+  carouselIndex = next;
+  renderCarouselEntry();
+}
+
+function openCarousel(entryList, startIndex) {
+  carouselEntries = entryList;
+  carouselIndex = startIndex;
+  carouselOverlay.hidden = false;
+  renderCarouselEntry();
+}
+
+async function renderCarouselEntry() {
+  const entry = carouselEntries[carouselIndex];
+  carouselCounter.textContent = (carouselIndex + 1) + ' of ' + carouselEntries.length;
+  carouselPrev.disabled = carouselIndex === 0;
+  carouselNext.disabled = carouselIndex === carouselEntries.length - 1;
+  carouselDate.textContent = entry.date ? entry.date.slice(0, 10) : '';
+  carouselBody.innerHTML = '<div class="entry-modal-loading">Loading entry…</div>';
+
+  let data = entryCache.get(entry.entry_id);
+  if (data === undefined) {
+    try {
+      const res = await fetch('/api/entry/' + encodeURIComponent(entry.entry_id));
+      data = res.ok ? await res.json() : 'error';
+    } catch (err) {
+      data = 'error';
+    }
+    entryCache.set(entry.entry_id, data);
+  }
+
+  // The user may have paged to a different entry before this fetch
+  // resolved -- bail out rather than rendering stale content over it.
+  if (carouselEntries[carouselIndex] !== entry) return;
+
+  if (data === 'error') {
+    carouselBody.innerHTML = '<div class="entry-modal-loading">Could not load entry.</div>';
+    return;
+  }
+
+  carouselDate.textContent = data.date ? data.date.slice(0, 10) : (entry.date ? entry.date.slice(0, 10) : '');
+  carouselBody.innerHTML = '';
+  if (data.photo) {
+    const img = document.createElement('img');
+    img.className = 'carousel-photo';
+    img.src = '/photos/' + encodeURIComponent(data.photo);
+    img.alt = 'Journal photo';
+    img.addEventListener('click', () => openLightbox(img.src));
+    carouselBody.appendChild(img);
+  }
+  // Entries with no photo still render fully -- just as a text-only card.
+  const textEl = document.createElement('div');
+  textEl.className = 'carousel-text';
+  textEl.textContent = data.text;
+  carouselBody.appendChild(textEl);
+}
+
+// Recognizes a date written either as ISO ("2026-07-10") or as the
+// human-readable form Claude sometimes writes instead ("Jan 19, 2026" /
+// "January 19, 2026" / "Jan. 19, 2026"), and normalizes either one to
+// "YYYY-MM-DD" so it can be looked up against dateToEntry below. Mirrors
+// the month-name matching server.py already does in _answer_mentions_date
+// -- that logic decides which sources to keep, this decides which
+// excerpt lines get a "View entry" button, so they need to agree on what
+// counts as a date mention.
+const MONTH_INDEX = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+
+function extractIsoDayFromLine(text) {
+  let m = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+
+  m = text.match(/\b([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b/);
+  if (m) {
+    const mon = MONTH_INDEX[m[1].slice(0, 3).toLowerCase()];
+    if (mon) {
+      const day = String(parseInt(m[2], 10)).padStart(2, '0');
+      const monStr = String(mon).padStart(2, '0');
+      return m[3] + '-' + monStr + '-' + day;
+    }
+  }
+  return null;
+}
+
+// Attach "View entry" buttons to source date lines in a journal bubble.
+// Called after addRow() creates a new journal message.
+function attachExpandButtons(row, sources) {
+  // Map from day -> {entry_id, date}; first source with that day wins.
+  const dateToEntry = new Map();
+  for (const s of sources) {
+    if (s.entry_id && s.date) {
+      const day = s.date.slice(0, 10);
+      if (!dateToEntry.has(day)) dateToEntry.set(day, { entry_id: s.entry_id, date: s.date });
+    }
+  }
+  if (dateToEntry.size === 0) return;
+
+  // Build the carousel's entry order to match the order excerpts actually
+  // appear in the rendered answer, top to bottom -- NOT the order sources
+  // arrived from the backend. That backend order was the bug: the "View
+  // entry" button under the Nth excerpt line opened the carousel at that
+  // entry's position in the *sources* array, which rarely matches its
+  // position in the text Claude actually wrote (retrieval order vs.
+  // citation order). Deduped by entry_id so a repeated date reuses the
+  // same carousel position instead of adding a duplicate.
+  const entryList = [];
+  const indexByEntryId = new Map();
+
+  // Only .answer-line elements now -- splitIntoAnswerLines() always wraps
+  // every line, so the parent .bubble no longer needs to be matched too
+  // (matching both used to also fire once on the bubble's full concatenated
+  // text, which -- being first in document order -- threw the ordering off
+  // even further).
+  row.querySelectorAll('.answer-line').forEach(el => {
+    const text = el.textContent || '';
+    const day = extractIsoDayFromLine(text);
+    if (!day) return;
+    const entry = dateToEntry.get(day);
+    if (!entry) return;
+    if (el.querySelector('.expand-entry-btn')) return; // already added
+
+    let index = indexByEntryId.get(entry.entry_id);
+    if (index === undefined) {
+      index = entryList.length;
+      entryList.push(entry);
+      indexByEntryId.set(entry.entry_id, index);
+    }
+
+    const btn = document.createElement('button');
+    btn.className = 'expand-entry-btn';
+    btn.textContent = '⤢ View entry';
+    btn.addEventListener('click', () => openCarousel(entryList, index));
+    el.appendChild(document.createTextNode(' '));
+    el.appendChild(btn);
+  });
+}
+
+// --- Mood-over-time chart ---
+const moodToggle = document.getElementById('mood-toggle');
+const moodModalOverlay = document.getElementById('mood-modal-overlay');
+const moodModalBody = document.getElementById('mood-modal-body');
+const moodModalClose = document.getElementById('mood-modal-close');
+
+function closeMoodModal() {
+  moodModalOverlay.hidden = true;
+}
+
+moodModalClose.addEventListener('click', closeMoodModal);
+moodModalOverlay.addEventListener('click', (e) => {
+  if (e.target === moodModalOverlay) closeMoodModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !moodModalOverlay.hidden) closeMoodModal();
+});
+
+moodToggle.addEventListener('click', async () => {
+  moodModalOverlay.hidden = false;
+  moodModalBody.innerHTML = '<div class="entry-modal-loading">Loading mood data…</div>';
+  try {
+    const res = await fetch('/api/mood');
+    const data = await res.json();
+    if (!res.ok) {
+      moodModalBody.innerHTML = '<div class="mood-empty">Could not load mood data.</div>';
+      return;
+    }
+    renderMoodChart(data);
+  } catch (err) {
+    moodModalBody.innerHTML = '<div class="mood-empty">Could not reach the server.</div>';
+  }
+});
+
+// Renders a simple diverging bar chart: bars above the zero line are
+// positive-leaning months, bars below are negative-leaning months.
+// Built as a hand-rolled SVG (no chart library needed) so it stays in
+// sync with the journal's own visual style via CSS variables.
+function renderMoodChart(data) {
+  const months = data.months || [];
+
+  if (!months.length) {
+    moodModalBody.innerHTML =
+      '<div class="mood-empty">' +
+      escapeHtml(data.note || 'No mood data yet -- keep journaling and check back soon!') +
+      '</div>';
+    return;
+  }
+
+  const chartTop = 10;
+  const chartBottom = 150;
+  const zeroY = chartTop + (chartBottom - chartTop) / 2;
+  const halfHeight = (chartBottom - chartTop) / 2 - 6;
+
+  const width = Math.max(360, months.length * 46);
+  const step = width / months.length;
+  const barWidth = Math.min(28, step * 0.55);
+
+  const POS_COLOR = 'var(--sage-deep)';
+  const NEG_COLOR = '#B97575';
+  const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  let bars = '';
+  let labels = '';
+
+  months.forEach((m, i) => {
+    const cx = step * i + step / 2;
+    const sentiment = m.avg_sentiment || 0;
+    const barHeight = Math.max(Math.abs(sentiment) * halfHeight, 1.5);
+    const y = sentiment >= 0 ? zeroY - barHeight : zeroY;
+    const color = sentiment >= 0 ? POS_COLOR : NEG_COLOR;
+
+    const [yearStr, monStr] = (m.month || '').split('-');
+    const monIdx = Math.max(0, Math.min(11, parseInt(monStr, 10) - 1));
+    const monthName = MONTH_ABBR[monIdx] || m.month;
+    const shortYear = (yearStr || '').slice(2);
+    const sign = sentiment > 0 ? '+' : '';
+    const tooltip = `${monthName} ${yearStr}: ${sign}${sentiment.toFixed(2)} avg (${m.entry_count} entr${m.entry_count === 1 ? 'y' : 'ies'})`;
+
+    bars += '<rect class="mood-bar" x="' + (cx - barWidth / 2).toFixed(1) +
+      '" y="' + y.toFixed(1) + '" width="' + barWidth.toFixed(1) +
+      '" height="' + barHeight.toFixed(1) + '" rx="3" fill="' + color + '">' +
+      '<title>' + escapeHtml(tooltip) + '</title></rect>';
+
+    labels += '<text class="mood-month-label" x="' + cx.toFixed(1) +
+      '" y="' + (chartBottom + 14) + '" text-anchor="middle">' +
+      escapeHtml(monthName + " '" + shortYear) + '</text>';
+  });
+
+  const svg =
+    '<svg viewBox="0 0 ' + width + ' ' + (chartBottom + 24) + '" xmlns="http://www.w3.org/2000/svg">' +
+    '<line class="mood-zero-line" x1="0" y1="' + zeroY + '" x2="' + width + '" y2="' + zeroY + '" />' +
+    bars + labels + '</svg>';
+
+  moodModalBody.innerHTML =
+    '<div class="mood-chart-wrap">' + svg +
+    '<div class="mood-legend">' +
+    '<span><span style="color:' + NEG_COLOR + '">&#9679;</span> Rougher months</span>' +
+    '<span>Brighter months <span style="color:var(--sage-deep)">&#9679;</span></span>' +
+    '</div></div>';
+}
+</script>
+
+</body>
+</html>

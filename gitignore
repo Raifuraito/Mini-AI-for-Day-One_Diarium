@@ -1,0 +1,4 @@
+# NOTE: this file has no leading dot, so git never actually reads it as
+# an ignore file -- that was a bug from an earlier setup attempt. The
+# real one Claude created is .gitignore (with the dot), 2026-08-28.
+# This file is unused and safe to delete.

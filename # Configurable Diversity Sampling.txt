@@ -1,0 +1,126 @@
+# Configurable Diversity Sampling
+
+## The Improvement
+
+Previously, diversity sampling was hardcoded at 10+ photos. Now it's **fully configurable** and controls **entries**, not photos (since photos follow entries).
+
+## Configuration Settings
+
+In `config.py`:
+
+### 1. DIVERSITY_ENTRY_THRESHOLD = 3
+**When to trigger diversity sampling:**
+```python
+DIVERSITY_ENTRY_THRESHOLD = 3  # Sample if 3+ entries have photos
+```
+
+Examples:
+- `3` = trigger sampling when 3 or more entries have photos
+- `5` = trigger sampling when 5 or more entries have photos
+- `10` = trigger sampling when 10 or more entries have photos
+
+Lower values = sample more aggressively = more variety on repeated questions
+
+### 2. DIVERSITY_MAX_ENTRIES = None
+**Cap the maximum number of entries shown:**
+```python
+DIVERSITY_MAX_ENTRIES = None   # None = show all entries
+DIVERSITY_MAX_ENTRIES = 5      # Show max 5 entries
+DIVERSITY_MAX_ENTRIES = 10     # Show max 10 entries
+DIVERSITY_MAX_ENTRIES = 20     # Show max 20 entries
+```
+
+Since **photos follow entries**, this controls photo count too!
+
+## How It Works
+
+### Scenario 1: Regular Question
+```
+Question: "what was happening in january?"
+Retrieved entries: 8 entries with photos
+
+DIVERSITY_ENTRY_THRESHOLD = 3
+→ 8 >= 3, so check if diversity question
+→ Not a diversity question (no "give me more", "tell me more")
+→ Show all 8 entries + all their photos
+```
+
+### Scenario 2: Diversity Question
+```
+Question: "give me more of a reflection"
+Retrieved entries: 8 entries with photos
+
+DIVERSITY_ENTRY_THRESHOLD = 3
+DIVERSITY_MAX_ENTRIES = None
+→ 8 >= 3 AND is diversity question
+→ Apply diversity sampling: keep top 2 entries, randomly sample the rest
+→ Result: ~6 entries shown (varied combination)
+
+DIVERSITY_MAX_ENTRIES = 5
+→ After sampling, cap at 5 entries max
+→ Result: 5 entries shown
+```
+
+### Scenario 3: Small Result Set
+```
+Question: "give me more of a reflection"
+Retrieved entries: 2 entries with photos
+
+DIVERSITY_ENTRY_THRESHOLD = 3
+→ 2 < 3, so no diversity sampling needed
+→ Show all 2 entries + their photos
+```
+
+## Code Changes
+
+### config.py (Lines 82-92)
+```python
+# --- Diversity sampling for repeated questions ---
+# When a diversity question ("give me more", "tell me more") retrieves this many
+# or more entries, apply random sampling to show variety on repeated asks.
+DIVERSITY_ENTRY_THRESHOLD = 3
+
+# For diversity questions, cap the maximum number of entries shown.
+DIVERSITY_MAX_ENTRIES = None  # None = show all entries
+```
+
+### ask.py (Lines 393-413)
+```python
+# Uses config to decide when and how much to sample
+diversity_threshold = getattr(config, "DIVERSITY_ENTRY_THRESHOLD", 3)
+diversity_max_entries = getattr(config, "DIVERSITY_MAX_ENTRIES", None)
+
+# Count entries with photos
+entries_with_photos = len([e for e in retrieved_entry_ids if e in photos_by_entry and photos_by_entry[e]])
+
+# Apply sampling if threshold met
+if _is_diversity_question(question) and entries_with_photos >= diversity_threshold:
+    # Keep top 2, randomly sample the rest
+    # ...
+    
+# Cap if configured
+if diversity_max_entries and len(photos) > diversity_max_entries:
+    photos = photos[:diversity_max_entries]
+```
+
+## Recommended Settings
+
+| Use Case | THRESHOLD | MAX_ENTRIES |
+|----------|-----------|------------|
+| Show everything | 100 | None |
+| Some variety | 5 | None |
+| Moderate variety (default) | 3 | None |
+| Strict variety | 3 | 10 |
+| Very limited | 3 | 5 |
+
+## What Changed
+
+- **Trigger point**: Now 3+ entries (was hardcoded at 10 photos)
+- **Configurability**: Two new settings control behavior
+- **Entry-centric**: Caps entries, not photos (photos follow entries)
+- **Flexible**: Can easily adjust for your preferences
+
+## Files Changed
+
+- `config.py`: Added DIVERSITY_ENTRY_THRESHOLD and DIVERSITY_MAX_ENTRIES
+- `ask.py`: Updated sampling logic to use config values and count entries

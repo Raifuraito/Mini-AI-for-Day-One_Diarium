@@ -1,0 +1,43 @@
+# --- Your journal data -- never commit this ---
+# These are generated locally by ingest.py / server.py and contain your
+# actual journal content (or paths/hashes derived from it). None of this
+# should ever leave your computer.
+chroma_db/
+photos/
+_extracted_exports/
+exports/
+processed_entries.json
+tag_backfill_log.json
+chat_history.jsonl
+paths.txt
+PHOTO_EMBEDDING_FIX.md
+
+# --- Secrets ---
+# Your Anthropic API key lives here if you used setup_wizard.py, or in
+# your shell environment otherwise. Either way, never commit this file.
+.env
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+
+# --- OS clutter ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editors ---
+.vscode/
+.idea/
+*.swp
+
+# --- Logs ---
+*.log
+_to_delete/
