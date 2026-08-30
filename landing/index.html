@@ -1348,9 +1348,17 @@
             <dt>Windows / Android</dt>
             <dd>no easy way to pick just part &mdash; usually the whole journal</dd>
           </dl>
+          <p>Separately, if you journal on your phone too: it's your <em>phone's</em> OS that decides the setup effort here, not your desktop's.</p>
+          <dl class="limitation-split">
+            <dt>iPhone</dt>
+            <dd>needs a one-time Shortcut to bridge into your sync folder &mdash; two minutes, once</dd>
+            <dt>Android</dt>
+            <dd>share sheet already targets your cloud folder directly &mdash; no extra setup</dd>
+          </dl>
           <details class="tech-details">
             <summary>Technical details</summary>
             <div class="tech-content">
+              <p>Day One's own real-time Sync between devices is a paid Silver/Gold feature ($49.99&ndash;$74.99/year) &mdash; most people using a free, self-hosted tool like this one aren't also paying for that, so your phone stays the one place your entries and photos actually live. Windows+iPhone and Mac+iPhone are identical to each other for this; so are Windows+Android and Mac+Android. Both desktop OSes run every major cloud provider's sync client the same way, so the desktop half of the pairing doesn't change anything.</p>
               <p>On Mac and iOS, Day One lets you filter by date range or tag before exporting, so a partial export is genuinely possible. On Android, there's some ability to narrow things down, though it's less clearly documented. On Windows and the web app, Day One currently exports your entire journal only &mdash; there's no built-in way to export just a range of entries.</p>
               <p>If you're on Windows or the web: your first export (and re-exports) will be your whole journal every time. This project hashes each entry and only re-processes ones that changed, so a repeated whole-journal export is still cheap and safe &mdash; it just means the export step itself takes a bit longer than a quick filtered one would.</p>
             </div>
@@ -1359,6 +1367,7 @@
         <div class="limitation-card">
           <h3>If you use Diarium</h3>
           <p>Exports your whole journal every time, on every device &mdash; and the file format isn't officially documented, so this project makes its best guess at reading it, and says clearly if it can't.</p>
+          <p>Its own sync is continuous through your own cloud folder, so there's no export-and-reupload dance the way there is with Day One &mdash; the catch is Cloud Sync needs a separate paid upgrade on <em>each</em> platform (Windows ships with it included; iPhone, Android, and Mac each need their own), and Google Drive is the slowest of its supported backends, if you get to pick.</p>
           <details class="tech-details">
             <summary>Technical details</summary>
             <div class="tech-content">

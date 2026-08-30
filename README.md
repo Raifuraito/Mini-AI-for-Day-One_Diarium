@@ -9,6 +9,7 @@ This guide assumes no prior context. If you've never written a line of code, you
 ## Table of contents
 
 - [Is this for you?](#is-this-for-you)
+  - [If you journal on your phone: which combo is easiest?](#if-you-journal-on-your-phone-which-combo-is-easiest)
 - [What this actually costs](#what-this-actually-costs)
 - [Before you start: what you'll need](#before-you-start-what-youll-need)
 - [Step 1: Download and open the folder](#step-1-download-and-open-the-folder)
@@ -32,34 +33,66 @@ This guide assumes no prior context. If you've never written a line of code, you
 
 ## Is this for you?
 
-This project exists as a free, self-hosted alternative to paying for Day One's built-in AI features (or a similar paid journaling-AI product). If you already journal in **Day One**, this is close to a drop-in addition -- export your journal, point this at the export, and start asking it questions, at whatever the API costs actually are (typically a few cents to a few dollars a month, see below) instead of a subscription.
+This project exists as a free, self-hosted alternative to paying for Day One's built-in AI features (or a similar paid journaling-AI product). If you already journal in **Day One**, this is close to a drop-in addition -- export your journal, point this at the export, and start asking it questions, at whatever the API costs actually are (typically a few cents to a few dollars a month with a hosted provider, or nothing at all with a local model -- see below) instead of a subscription.
 
 It also has **best-effort, not-fully-verified** support for **Diarium** exports, and a generic fallback that has a reasonable chance of working with other journaling apps that export to JSON. See [Known limitations](#known-limitations-please-read-this-section) for exactly what "best-effort" means here before you rely on it.
 
 If you don't journal digitally in a format this can read, this project won't be useful to you as-is.
 
+### If you journal on your phone: which combo is easiest?
+
+**If you use Day One:** what actually determines the effort here is which *phone* you have, not which computer you pair it with. Day One's own real-time Sync between devices is a paid Silver/Gold feature ($49.99-$74.99/year) -- if you're using a free, self-hosted tool specifically to avoid subscription costs, you're probably not also paying for that, which means your phone is the one place your entries and photos actually live, and getting a fresh export means going back to the phone every time, regardless of which desktop you're pairing it with.
+
+| | iPhone | Android |
+|---|---|---|
+| Getting the export into your synced folder | A one-time ~2-minute [Apple Shortcut](#getting-exports-there-without-touching-a-cable) bridges Day One's share sheet into it | The share sheet already targets Dropbox/Drive directly -- no bridge needed |
+| Ongoing effort, once that's set up | One tap | One tap |
+| Changes with Windows vs. Mac? | No -- both run every major cloud provider's desktop app identically | No |
+
+Windows+iPhone and Mac+iPhone are identical to each other here, and Windows+Android and Mac+Android are identical to each other -- the desktop half of the pairing doesn't actually change anything. If you're on Android, you're already in the easier spot; if you're on iPhone, the Shortcut above is genuinely a one-time cost, not an ongoing one.
+
+**If you use Diarium:** the friction isn't about exporting at all -- Diarium already syncs continuously through your own cloud folder, so there's no phone-to-computer file dance the way there is with Day One. The catch is that Cloud Sync is a separate paid upgrade *on each platform* (the Windows app ships with it included; iPhone, Android, and Mac each need their own purchase to unlock it), and Google Drive specifically is the slowest of Diarium's supported cloud backends, if you have a choice of provider.
+
 ## What this actually costs
 
-Nothing here requires a subscription. This project works with several AI providers now (Anthropic, OpenAI, Google, Mistral, or a local Ollama model -- pick one in the setup wizard's Step 2), and what it costs is small, pay-as-you-go usage of whichever one you choose.
+**We don't take a cut.** This project is free and open-source -- the only cost is what the AI provider you choose charges you directly for their API, and if you're running a local model (Ollama, LM Studio, etc.), that cost is zero beyond your own electricity. Running a local model privately is only recommended if you have enough RAM to host one (usually 16 GB+).
+
+Nothing here requires a subscription. This project works with several AI providers now (Anthropic, OpenAI, Google, Mistral, or a local model -- pick one in the setup wizard's Step 2), and what it costs is small, pay-as-you-go usage of whichever one you choose.
 
 - **Setting up and running the app itself**: free. Flask, the vector database, and the web page all run locally with no cost.
 - **Embedding your journal into the local database**: free. This uses a local model, not an API call.
 - **Extracting tags** (what powers Max Recall, see below) -- **entirely optional, off by default**: a small amount per entry, using the cheapest model for whichever provider you picked. See the reference table just below for what tagging a first-time journal of about 1,000 entries actually costs by provider -- well under a dollar either way, but the exact number varies more than you'd guess between providers.
-- **Asking a question**: cost scales with how much context a question needs, not with how big your journal is -- a normal question and a "give me everything about X" Max Recall question cost differently, but neither gets more expensive just because you've been journaling for ten years instead of one. Ballpark: a few tenths of a cent per question with OpenAI, Google, or Mistral's cheap-tier models; roughly $0.005-$0.02 per question with Claude (Haiku or Sonnet, depending which you picked); nothing with Ollama beyond your own electricity.
+- **Asking a question**: cost scales with how much context a question needs, not with how big your journal is -- a normal question and a "give me everything about X" Max Recall question cost differently, but neither gets more expensive just because you've been journaling for ten years instead of one. Ballpark: a few tenths of a cent per question with OpenAI, Google, or Mistral's cheap-tier models; roughly $0.005-$0.02 per question with Claude (Haiku or Sonnet, depending which you picked); nothing with a local model beyond your own electricity.
 
-Realistically, for one person's personal use, this comes out to somewhere between a few cents and a few dollars a month depending on how often you use it and which provider you picked. Every provider except Ollama needs a small amount of prepaid API credit -- there's no free tier that avoids this step, but there's also no minimum spend or subscription; you're billed only for what you actually use.
+Realistically, for one person's personal use, this comes out to somewhere between a few cents and a few dollars a month depending on how often you use it and which provider you picked. Every hosted provider needs a small amount of prepaid API credit -- there's no free tier that avoids this step, but there's also no minimum spend or subscription; you're billed only for what you actually use. Every dollar goes to that provider, not to us.
 
 ### Reference: tagging a 1,000-entry journal from scratch
 
 A concrete "how much will this actually cost me" number, instead of a vague "fraction of a cent" -- this is what a **first-time tagging backfill of about 1,000 journal entries** costs, by provider:
 
-| Provider (cheapest/tagging model) | Input | Output | ~1,000 entries |
+**Budget tier** (what tagging uses by default -- the cheapest model from each provider):
+
+| Provider & model | Input | Output | ~1,000 entries |
 |---|---|---|---|
 | OpenAI (`gpt-4o-mini`) | $0.15 / M tokens | $0.60 / M tokens | **~$0.05** |
 | Google (`gemini-2.0-flash`) | $0.15 / M tokens | $0.60 / M tokens | **~$0.05** |
-| Mistral (`mistral-small-latest`) | $0.15 / M tokens | $0.60 / M tokens | **~$0.05** |
-| Anthropic (`claude-haiku-4-5`) | $1.00 / M tokens | $5.00 / M tokens | **~$0.35-$0.40** |
-| Ollama (local model) | $0 | $0 | **$0** |
+| Mistral (`mistral-small`) | $0.15 / M tokens | $0.60 / M tokens | **~$0.05** |
+| Anthropic (`claude-haiku-4-5`) | $1.00 / M tokens | $5.00 / M tokens | **~$0.39** |
+
+**Chat tier** (what answering questions uses -- the model you actually pick in the dropdown):
+
+| Provider & model | Input | Output | ~1,000 entries |
+|---|---|---|---|
+| OpenAI (`gpt-4.1-mini`) | $0.40 / M tokens | $1.60 / M tokens | **~$0.14** |
+| Google (`gemini-2.5-pro`) | $1.25 / M tokens | $10.00 / M tokens | **~$0.61** |
+| Mistral (`mistral-medium`) | $0.40 / M tokens | $2.00 / M tokens | **~$0.15** |
+| Anthropic (`claude-sonnet-4-5`) | $3.00 / M tokens | $15.00 / M tokens | **~$1.16** |
+
+**Local (free)**:
+
+| Provider | Input | Output | ~1,000 entries |
+|---|---|---|---|
+| Ollama / LM Studio / other local | $0 | $0 | **$0** |
 
 Token pricing above is current as of August 2026 (Anthropic's own pricing docs; independent pricing trackers for the others) -- check your provider's pricing page before budgeting against this, since rates do change over time.
 
@@ -128,9 +161,9 @@ That's it for this page. It writes everything into a file called `.env` inside t
 
 ### Keeping phone and computer in sync automatically
 
-If you journal from both your phone and your computer, exporting and manually moving the file every time gets old fast. The fix: pick **one cloud-synced folder** you already use anyway -- iCloud Drive, Dropbox, Google Drive, whatever -- and use that as your export destination on both devices. Point the "Journal export folder" field in the setup wizard at that folder's location on your computer.
+If you journal from both your phone and your computer, exporting and manually moving the file every time gets old fast. The fix: pick **one cloud-synced folder** you already use anyway -- iCloud Drive, Dropbox, Google Drive, whatever -- and point the wizard's **"Sync folder (drop zone)"** field at it. This is separate from the **"Storage folder (local)"** field, which is where exports actually live long-term -- the sync folder is just a temporary channel: `watcher.py` copies anything new out of it into permanent storage and deletes it from the synced copy, so your cloud storage never fills up with old exports.
 
-Once that's set up, exporting from either device (following the steps above, just choosing that synced folder as the save location) lands the file in the same place automatically, with no extra manual step to move it around.
+Once that's set up, exporting from either device (following the steps above, just choosing that synced folder as the save location) lands the file in permanent storage automatically within a minute or so, with no extra manual step to move it around.
 
 Day One doesn't support exporting just the entries since your last export -- only the whole journal, every time. That's fine here on purpose: this project remembers which entries it's already processed (by a checksum of their content, not by trusting file names or dates), so re-exporting your whole journal and re-running ingestion regularly is cheap and safe. Only entries that are actually new or edited get sent to the API and re-processed; nothing gets double-charged.
 
@@ -186,7 +219,9 @@ The web app above only listens on your own computer by default. To reach it from
 
 ### Getting exports there without touching a cable
 
-The "Journal export folder" field in the setup wizard doesn't have to be a plain local folder — point it at a cloud-sync folder instead (Dropbox, iCloud Drive, OneDrive, Google Drive, Proton Drive, MEGA, or anything similar) and exporting from your phone into that same synced folder means it shows up here automatically within a minute, no manual copying required. The wizard detects common ones already installed on this computer and offers them as one-click suggestions; typing or pasting any other folder's path works exactly the same.
+The wizard's **"Sync folder (drop zone)"** field doesn't have to be a plain local folder — point it at a cloud-sync folder instead (Dropbox, iCloud Drive, OneDrive, Google Drive, Proton Drive, MEGA, or anything similar) and exporting from your phone into that same synced folder means it shows up here automatically within a minute, no manual copying required. The wizard shows every provider with a sensible default path already filled in, plus a Browse button next to each field if you'd rather point-and-click to the exact folder than type a path.
+
+**Need to change this later?** Click the &#9881; Settings icon in the main journal app's header — it opens the wizard right where you left off, with your API key already filled in (you don't need to re-enter it unless you're actually replacing it).
 
 **Day One on iPhone, via Apple Shortcuts:** Day One's own export can't write directly into an arbitrary folder, but a two-action Shortcut bridges that gap. In the Shortcuts app:
 
@@ -238,10 +273,10 @@ Test it with a log-off/log-on (or right-click the task → Run), then check Task
 **If some entries are missing tags** -- because tagging was off when they were first ingested and you've since turned it on, or a large first-time tagging run got interrupted partway through -- catch them up with:
 
 ```bash
-python tag_backfill.py --count        # see how many entries still need tags (free, no API calls)
-python tag_backfill.py                # tag up to 300 of them, then stop
-python tag_backfill.py --limit 500    # tag up to 500 this run
-python tag_backfill.py --all          # tag everything that's left, in one go
+python tools/tag_backfill.py --count        # see how many entries still need tags (free, no API calls)
+python tools/tag_backfill.py                # tag up to 300 of them, then stop
+python tools/tag_backfill.py --limit 500    # tag up to 500 this run
+python tools/tag_backfill.py --all          # tag everything that's left, in one go
 ```
 
 It's safe to interrupt with Ctrl+C and safe to re-run -- progress is saved as each batch completes, and an entry Claude finds nothing notable in is remembered so it's never re-sent (and re-charged for) on a later run.
@@ -281,13 +316,13 @@ This project is built and maintained by one person for personal use, and shared 
 - **Mac compatibility has been code-reviewed and tested in a Mac-like (POSIX/Linux) environment, but not run on an actual Mac.** The one genuinely Windows-specific piece found in the whole codebase (how `watcher.py` checks whether Chrome is running) has been fixed to work on both. Everything else already worked identically on both operating systems by nature of how Python handles file paths. If something doesn't work as expected on a real Mac, please open a GitHub issue.
 - **Photo search (the CLIP-based visual part) is a genuinely large optional install** -- see [Photo search](#photo-search-optional) above. Skip it if you don't need it; nothing else in the app is affected.
 - **There is no login or password on the web app.** Anyone who can reach the port it's running on can read your journal and ask it questions. This is fine used privately over Tailscale (see [Using it from your phone](#using-it-from-your-phone)) and not fine exposed to the open internet -- see [Privacy and security](#privacy-and-security) below.
-- **Real, small costs apply**, via the Anthropic API -- see [What this actually costs](#what-this-actually-costs) above for specifics. There's no way to use the tagging or question-answering features entirely for free, since those specifically require calling Claude.
+- **Real, small costs apply** via whichever AI provider you chose -- see [What this actually costs](#what-this-actually-costs) above for specifics. There's no way to use the tagging or question-answering features entirely for free with a hosted provider (Anthropic, OpenAI, Google, Mistral), since those require API calls. Running a local model (Ollama, LM Studio, etc.) avoids all API costs but needs enough RAM to host one.
 
 ## Privacy and security
 
-Your journal stays on your computer. The only things that ever leave it are: the specific excerpts relevant to whatever question you just asked (sent to Anthropic's API to generate the answer), and short snippets of each entry at tagging time (sent the same way, to extract that entry's tags). Nothing else -- not your whole journal, not your photos in bulk, nothing -- is ever uploaded anywhere, by this project or by Anthropic's API on its own.
+Your journal stays on your computer. The only things that ever leave it are: the specific excerpts relevant to whatever question you just asked (sent to your chosen AI provider's API to generate the answer), and short snippets of each entry at tagging time (sent the same way, to extract that entry's tags). If you're using a local model (Ollama, LM Studio, etc.), nothing leaves your computer at all. Nothing else -- not your whole journal, not your photos in bulk, nothing -- is ever uploaded anywhere.
 
-**Your API key** is either stored in a local `.env` file (created by the setup wizard) or in your own computer's environment variables -- never hardcoded anywhere in the code, and never sent anywhere except as authentication when this project itself calls the Anthropic API on your behalf. The `.env` file is already excluded from git via `.gitignore`, so it can't end up on GitHub by accident if you ever push your own changes to a repo. If a key is ever accidentally exposed anyway, revoke it immediately at [console.anthropic.com](https://console.anthropic.com) and issue a new one -- there's no way to "undo" an exposed key otherwise.
+**Your API key** is either stored in a local `.env` file (created by the setup wizard) or in your own computer's environment variables -- never hardcoded anywhere in the code, and never sent anywhere except as authentication when this project itself calls your chosen provider's API on your behalf. The `.env` file is already excluded from git via `.gitignore`, so it can't end up on GitHub by accident if you ever push your own changes to a repo. If a key is ever accidentally exposed, revoke it immediately on your provider's console and issue a new one.
 
 **Everything else sensitive** -- the vector database (`chroma_db/`), extracted photos (`photos/`), your raw export files, and the chat history log -- also lives only on your computer and is excluded from git the same way. No one else, including whoever built this project, ever has access to any of it. This isn't a hosted service; there's no server anywhere except the one running on your own machine.
 
@@ -311,7 +346,11 @@ journal-rag/
 ├── setup_wizard.py          # The setup page these launchers open
 ├── ask.py                   # Question routing + retrieval logic
 ├── ingest.py                 # Reads journal exports into the local database, extracts tags
-├── tag_backfill.py           # Catches up entries missing tags, in resumable batches
+├── tools/
+│   ├── tag_backfill.py       # Catches up entries missing tags, in resumable batches
+│   ├── backfill_photo_metadata.py
+│   ├── diagnose_photos.py
+│   └── inspect_photo_meta.py
 ├── config.py                 # All settings in one place
 ├── watcher.py                 # Optional: auto-ingest new exports + auto-start the server
 ├── webapp/

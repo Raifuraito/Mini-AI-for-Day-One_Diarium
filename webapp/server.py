@@ -14,6 +14,8 @@ Then, on your phone (via Tailscale), visit:
 import sys
 import os
 import json
+import socket
+import subprocess
 from datetime import datetime
 
 from flask import Flask, request, jsonify, render_template, send_from_directory
@@ -157,6 +159,60 @@ def _require_llm():
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+def _wizard_already_running():
+    try:
+        with socket.create_connection(("127.0.0.1", 5050), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+@app.route("/open-settings")
+def open_settings():
+    """
+    Opens the setup wizard (folders, API key, provider) without needing a
+    terminal. If it isn't already running on :5050, starts it in the
+    background first; either way, the page below waits until it responds
+    and then sends the browser there.
+    """
+    if not _wizard_already_running():
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        env = os.environ.copy()
+        env["JOURNAL_WIZARD_EMBEDDED"] = "1"
+        subprocess.Popen(
+            [sys.executable, "setup_wizard.py"],
+            cwd=project_root,
+            env=env,
+        )
+
+    return """<!doctype html><html><head><meta charset="utf-8">
+<title>Opening settings&hellip;</title>
+<style>
+  body{font-family:system-ui,-apple-system,sans-serif;display:flex;
+       align-items:center;justify-content:center;height:100vh;margin:0;
+       background:#faf9f6;color:#3a352e;text-align:center;padding:0 24px}
+</style></head><body>
+<p id="msg">Opening settings&hellip;</p>
+<script>
+  var tries = 0;
+  function check() {
+    fetch("http://127.0.0.1:5050", {mode: "no-cors"}).then(function () {
+      window.location.href = "http://127.0.0.1:5050";
+    }).catch(function () {
+      tries++;
+      if (tries > 40) {
+        document.getElementById("msg").textContent =
+          "Still starting -- if this doesn't open in a few seconds, " +
+          "open http://localhost:5050 yourself.";
+      }
+      setTimeout(check, 250);
+    });
+  }
+  check();
+</script>
+</body></html>"""
 
 
 @app.route("/api/ask", methods=["POST"])

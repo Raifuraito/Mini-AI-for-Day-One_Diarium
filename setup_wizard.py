@@ -40,6 +40,12 @@ import sys
 import threading
 import time
 
+# Set by webapp/server.py's /open-settings route before it spawns this
+# process, so /save knows it's safe to close itself automatically when
+# you're done -- a normal "python setup_wizard.py" launch never sets this,
+# and behaves exactly as before (stays open after Save).
+_EMBEDDED_LAUNCH = os.environ.get("JOURNAL_WIZARD_EMBEDDED") == "1"
+
 # --- Self-bootstrap: make sure Flask is available before we need it ---
 # Deliberately written using ONLY the standard library (os, subprocess,
 # sys -- all always present in any normal Python install) so that this
@@ -434,6 +440,7 @@ def render_page(banner_html, env_values, path_values, tagging_enabled=False):
         "google": "Google (Gemini)",
         "mistral": "Mistral",
         "ollama": "Ollama (local, free)",
+        "local_other": "Other local model (LM Studio, llama.cpp, etc.)",
     }
     for pid, plabel in provider_options.items():
         old_opt = f'<option value="{pid}">{plabel}</option>'
@@ -463,6 +470,9 @@ def render_page(banner_html, env_values, path_values, tagging_enabled=False):
     page = page.replace("__API_KEY_MISTRAL__", _html.escape(env_values.get("MISTRAL_API_KEY", "")))
     page = page.replace("__OLLAMA_URL__", _html.escape(env_values.get("OLLAMA_BASE_URL", "http://localhost:11434")))
     page = page.replace("__OLLAMA_MODEL__", _html.escape(env_values.get("OLLAMA_MODEL", "llama3.1")))
+    page = page.replace("__LOCAL_OTHER_URL__", _html.escape(env_values.get("LOCAL_OTHER_BASE_URL", "http://localhost:1234")))
+    page = page.replace("__API_KEY_LOCAL_OTHER__", _html.escape(env_values.get("LOCAL_OTHER_API_KEY", "")))
+    page = page.replace("__LOCAL_OTHER_MODEL__", _html.escape(env_values.get("LOCAL_OTHER_MODEL", "")))
 
     # --- Model selectors: mark saved model as selected ---
     def _select_model(page, placeholder, saved_val):
@@ -769,6 +779,11 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   }
   .success { background: #DCE8D4; }
   .warn { background: #E8CFC4; }
+  .cost-table { width: 100%; border-collapse: collapse; margin: 10px 0 6px; font-size: 13px; background: #fff; border-radius: 4px; }
+  .cost-table th, .cost-table td { text-align: left; padding: 6px 10px; }
+  .cost-table th { background: #DCD3BF; }
+  .cost-table td { border-top: 1px solid #E8E1D2; }
+  .cost-table code { background: transparent; padding: 0; }
   code { background: #E8E1D2; padding: 1px 5px; border-radius: 3px; }
   details { margin-top: 20px; }
   summary {
@@ -867,13 +882,27 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     <h2>Step 2: Your AI provider</h2>
     <div class="banner warn">
       <strong>This app is free and open-source, and we don't earn anything from it.</strong>
-      That said, using it isn't free: asking questions and tagging entries both call
-      whichever AI provider you pick below, and <strong>that provider bills you directly</strong>
-      for it &mdash; Anthropic, OpenAI, Google, or Mistral. Every dollar goes to them, none of it
-      to us. For a concrete sense of scale: tagging a 1,000-entry journal from scratch costs
-      roughly <strong>$0.05 to $0.40</strong> depending on provider (see Step 3 below and the
-      README for the full breakdown). Ollama runs locally and costs nothing but your own
-      electricity.
+      Using it isn't free, though: asking questions and tagging entries call whichever
+      provider you pick below, and <strong>that provider bills you directly</strong> &mdash;
+      every dollar goes to them, none to us.
+      <table class="cost-table">
+        <tr><th>Provider &amp; model</th><th>Input</th><th>Output</th><th>~1,000 entries</th></tr>
+        <tr><th colspan="4" style="background:#e8e1d2;font-size:12px;text-transform:uppercase;letter-spacing:.5px">Budget tier (tagging default)</th></tr>
+        <tr><td>OpenAI (<code>gpt-4o-mini</code>)</td><td>$0.15/M</td><td>$0.60/M</td><td><strong>~$0.05</strong></td></tr>
+        <tr><td>Google (<code>gemini-2.0-flash</code>)</td><td>$0.15/M</td><td>$0.60/M</td><td><strong>~$0.05</strong></td></tr>
+        <tr><td>Mistral (<code>mistral-small</code>)</td><td>$0.15/M</td><td>$0.60/M</td><td><strong>~$0.05</strong></td></tr>
+        <tr><td>Anthropic (<code>claude-haiku-4-5</code>)</td><td>$1.00/M</td><td>$5.00/M</td><td><strong>~$0.39</strong></td></tr>
+        <tr><th colspan="4" style="background:#e8e1d2;font-size:12px;text-transform:uppercase;letter-spacing:.5px">Chat tier (question-answering)</th></tr>
+        <tr><td>OpenAI (<code>gpt-4.1-mini</code>)</td><td>$0.40/M</td><td>$1.60/M</td><td><strong>~$0.14</strong></td></tr>
+        <tr><td>Google (<code>gemini-2.5-pro</code>)</td><td>$1.25/M</td><td>$10.00/M</td><td><strong>~$0.61</strong></td></tr>
+        <tr><td>Mistral (<code>mistral-medium</code>)</td><td>$0.40/M</td><td>$2.00/M</td><td><strong>~$0.15</strong></td></tr>
+        <tr><td>Anthropic (<code>claude-sonnet-4-5</code>)</td><td>$3.00/M</td><td>$15.00/M</td><td><strong>~$1.16</strong></td></tr>
+        <tr><th colspan="4" style="background:#e8e1d2;font-size:12px;text-transform:uppercase;letter-spacing:.5px">Local (free)</th></tr>
+        <tr><td>Ollama / LM Studio / other local</td><td>$0</td><td>$0</td><td><strong>$0</strong></td></tr>
+      </table>
+      Ollama / LM Studio / other local models run on your own computer &mdash; free,
+      but usually need <strong>16GB+ RAM</strong> to run a model capable enough to be useful,
+      and expect reduced functionality and occasional setup friction compared to a hosted provider.
     </div>
     <label>Provider
       <div class="hint">Which AI service should power your journal Q&amp;A?</div>
@@ -884,11 +913,12 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
       <option value="google">Google (Gemini)</option>
       <option value="mistral">Mistral</option>
       <option value="ollama">Ollama (local, free)</option>
+      <option value="local_other">Other local model (LM Studio, llama.cpp, etc.)</option>
     </select>
 
     <div id="provider-anthropic" class="provider-config">
       <label>Anthropic API key
-        <div class="hint">From <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> &rarr; Settings &rarr; API Keys.</div>
+        <div class="hint">From <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> &rarr; Settings &rarr; API Keys.<br>Already saved a key below? You don't need to re-enter it &mdash; it's kept as-is unless you type a new one.</div>
       </label>
       <input type="password" name="ANTHROPIC_API_KEY" value="__API_KEY_ANTHROPIC__" placeholder="sk-ant-...">
       <label>Model
@@ -909,7 +939,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 
     <div id="provider-openai" class="provider-config" style="display:none">
       <label>OpenAI API key
-        <div class="hint">From <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a></div>
+        <div class="hint">From <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>.<br>Already saved a key below? You don't need to re-enter it &mdash; it's kept as-is unless you type a new one.</div>
       </label>
       <input type="password" name="OPENAI_API_KEY" value="__API_KEY_OPENAI__" placeholder="sk-...">
       <label>Model</label>
@@ -928,7 +958,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 
     <div id="provider-google" class="provider-config" style="display:none">
       <label>Google AI API key
-        <div class="hint">From <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a></div>
+        <div class="hint">From <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>.<br>Already saved a key below? You don't need to re-enter it &mdash; it's kept as-is unless you type a new one.</div>
       </label>
       <input type="password" name="GOOGLE_API_KEY" value="__API_KEY_GOOGLE__" placeholder="AI...">
       <label>Model</label>
@@ -946,7 +976,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
 
     <div id="provider-mistral" class="provider-config" style="display:none">
       <label>Mistral API key
-        <div class="hint">From <a href="https://console.mistral.ai/api-keys" target="_blank">console.mistral.ai</a></div>
+        <div class="hint">From <a href="https://console.mistral.ai/api-keys" target="_blank">console.mistral.ai</a>.<br>Already saved a key below? You don't need to re-enter it &mdash; it's kept as-is unless you type a new one.</div>
       </label>
       <input type="password" name="MISTRAL_API_KEY" value="__API_KEY_MISTRAL__" placeholder="...">
       <label>Model</label>
@@ -971,6 +1001,21 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
         <div class="hint">Must already be pulled locally (e.g. <code>ollama pull llama3.1</code>).</div>
       </label>
       <input type="text" name="OLLAMA_MODEL" value="__OLLAMA_MODEL__" placeholder="llama3.1">
+    </div>
+
+    <div id="provider-local_other" class="provider-config" style="display:none">
+      <label>Local server URL
+        <div class="hint">The OpenAI-compatible API endpoint your local model exposes.<br>LM Studio: <code>http://localhost:1234</code> &bull; llama.cpp: <code>http://localhost:8080</code></div>
+      </label>
+      <input type="text" name="LOCAL_OTHER_BASE_URL" value="__LOCAL_OTHER_URL__" placeholder="http://localhost:1234">
+      <label>API key (optional)
+        <div class="hint">Most local servers don&rsquo;t require one. Leave blank unless your server is configured to require authentication.</div>
+      </label>
+      <input type="password" name="LOCAL_OTHER_API_KEY" value="__API_KEY_LOCAL_OTHER__" placeholder="(leave blank if not needed)">
+      <label>Model name
+        <div class="hint">The model identifier your server uses &mdash; check your server&rsquo;s loaded-model list.</div>
+      </label>
+      <input type="text" name="LOCAL_OTHER_MODEL" value="__LOCAL_OTHER_MODEL__" placeholder="e.g. mistral-7b-instruct">
     </div>
 
     <p class="hint" style="margin-top:8px">Tagging (Step 3) always uses the cheapest model available from your chosen provider, regardless of which model you pick above.</p>
@@ -1289,6 +1334,7 @@ _PROVIDER_KEY_FIELDS = {
     "google": "GOOGLE_API_KEY",
     "mistral": "MISTRAL_API_KEY",
     "ollama": None,  # Ollama is local, no API key
+    "local_other": None,  # local model, API key is optional (handled separately)
 }
 
 # Map of provider -> which model field(s) to save
@@ -1298,6 +1344,7 @@ _PROVIDER_MODEL_FIELDS = {
     "google": ["GEMINI_MODEL"],
     "mistral": ["MISTRAL_MODEL"],
     "ollama": ["OLLAMA_MODEL", "OLLAMA_BASE_URL"],
+    "local_other": ["LOCAL_OTHER_MODEL", "LOCAL_OTHER_BASE_URL", "LOCAL_OTHER_API_KEY"],
 }
 
 
@@ -1352,10 +1399,22 @@ def save():
         "calls) until you turn it back on here."
     )
 
-    banner = (
-        '<div class="banner success">Saved! ' + tagging_note
-        + ' Use Step 6 below to set up auto-start if you haven\'t already.</div>'
-    )
+    if _EMBEDDED_LAUNCH:
+        banner = (
+            '<div class="banner success">Saved! ' + tagging_note
+            + ' You can close this tab now &mdash; this settings window will stop itself in a few seconds.</div>'
+        )
+
+        def _delayed_exit():
+            time.sleep(3)
+            os._exit(0)
+
+        threading.Thread(target=_delayed_exit, daemon=True).start()
+    else:
+        banner = (
+            '<div class="banner success">Saved! ' + tagging_note
+            + ' Use Step 6 below to set up auto-start if you haven\'t already.</div>'
+        )
     return render_page(banner, values, path_values, tagging_enabled=tagging_enabled)
 
 
