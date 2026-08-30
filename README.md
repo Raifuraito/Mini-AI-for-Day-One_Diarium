@@ -6,6 +6,10 @@ It runs entirely on your own computer. Your journal itself never leaves your mac
 
 This guide assumes no prior context. If you've never written a line of code, you can still get this running by following it top to bottom.
 
+<p align="center">
+  <img src="screenshots/chat-ui.png" alt="Chat UI screenshot" width="600">
+</p>
+
 ## Table of contents
 
 - [Is this for you?](#is-this-for-you)
