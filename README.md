@@ -41,16 +41,28 @@ If you don't journal digitally in a format this can read, this project won't be 
 
 ### How to get your journal export into this project
 
-**If you use Day One:** this project needs a JSON export file. Day One lets you export from every platform — Mac, Windows, iPhone, Android, and the web app — so you can do it from whichever device is most convenient. The steps are the same everywhere:
+**If you use Day One:** this project needs a JSON export file. Day One lets you export from every platform, but **not every platform is equal** — the key difference is whether you can export *just the new entries* (incremental) or have to re-export *your entire journal* every time:
 
-1. Open Day One → **Settings** (or **File → Export** on Mac) → **Export** → **JSON**
-2. Save the `.zip` file into the **sync folder** you set up in the wizard (e.g. your Dropbox, iCloud Drive, OneDrive, or Google Drive folder)
+| Platform | Date-range filter? | Incremental export? | Notes |
+|---|---|---|---|
+| **iPhone** | ✅ Date range + tag filter | ✅ Yes — export just this week/month | Best export experience overall |
+| **Android** | ✅ Date range filter | ✅ Yes — export a date range | Good — similar to iPhone |
+| **Mac** | ⚠️ Manual (Shift+click entries) | ⚠️ Possible but manual | Native app, no date picker |
+| **Windows / Web** | ❌ No | ❌ Full journal only | Functional but no filtering |
 
-That's it — `watcher.py` picks it up from there automatically.
+**Why this matters:** if you journal every day and want to update weekly, exporting your entire 1,000+ entry journal each time is slow and wasteful. Incremental export (just the last week's entries) is much faster — and only your phone can do that easily.
 
-**Exporting from your computer** (Mac or Windows) is the easiest path, since you can save the `.zip` directly into your sync folder in one step. **Exporting from your phone** works too — on Android the share sheet can target your cloud folder directly; on iPhone you can either share into your cloud app (Files → iCloud/Dropbox) or use a quick [Apple Shortcut](#getting-exports-there-without-touching-a-cable) to bridge Day One's share sheet into your sync folder.
+**What this means for your setup:**
 
-**If you use Diarium:** the friction isn't about exporting at all — Diarium already syncs continuously through your own cloud folder, so there's no export-and-reupload dance. The catch is that Cloud Sync is a separate paid upgrade *on each platform* (the Windows app ships with it included; iPhone, Android, and Mac each need their own purchase to unlock it), and Google Drive specifically is the slowest of Diarium's supported cloud backends, if you have a choice of provider.
+- **Mac + iPhone**: the smoothest combo. Export from either — Mac's native app for a full export when you need one, iPhone for quick incremental updates. You'll probably just use the Mac since it's right there.
+- **Mac + Android**: similar story. Quick incremental exports from your Android phone, full exports from Mac when needed.
+- **Windows + iPhone**: your iPhone is your best friend here. Windows can only do full re-exports, so for ongoing use, export from your iPhone using the [Apple Shortcut](#getting-exports-there-without-touching-a-cable) below — one tap and it lands in your sync folder.
+- **Windows + Android**: same idea — export from your Android phone for incremental updates, since Windows can't filter by date.
+- **Windows only (no phone app)**: workable, but every export is the full journal. Fine for getting started; just slower for ongoing updates.
+
+Regardless of which device you export from, the steps are the same: export as **JSON**, save the `.zip` into your **sync folder**, and `watcher.py` picks it up automatically.
+
+**If you use Diarium:** Diarium syncs continuously through your own cloud folder, so there's no export-and-reupload dance at all — the catch is that Cloud Sync is a separate paid upgrade *on each platform* (the Windows app ships with it included; iPhone, Android, and Mac each need their own purchase to unlock it), and Google Drive specifically is the slowest of Diarium's supported cloud backends, if you have a choice of provider.
 
 ## What this actually costs
 

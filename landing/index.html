@@ -1341,26 +1341,36 @@
       <div class="limitations-grid">
         <div class="limitation-card">
           <h3>If you use Day One</h3>
-          <p>You can export just part of your journal, or the whole thing &mdash; depends on your device.</p>
-          <dl class="limitation-split">
-            <dt>Mac / iPhone</dt>
-            <dd>pick a date range or tag, export just that</dd>
-            <dt>Windows / Android</dt>
-            <dd>no easy way to pick just part &mdash; usually the whole journal</dd>
-          </dl>
-          <p>Separately, if you journal on your phone too: it's your <em>phone's</em> OS that decides the setup effort here, not your desktop's.</p>
+          <p>Every platform can export, but not every platform can export <em>just the new entries</em>. That&rsquo;s the friction difference:</p>
           <dl class="limitation-split">
             <dt>iPhone</dt>
-            <dd>needs a one-time Shortcut to bridge into your sync folder &mdash; two minutes, once</dd>
+            <dd><strong>Best.</strong> Date range + tag filtering &mdash; export just this week&rsquo;s entries in one tap.</dd>
             <dt>Android</dt>
-            <dd>share sheet already targets your cloud folder directly &mdash; no extra setup</dd>
+            <dd><strong>Good.</strong> Date range filtering &mdash; similar to iPhone for incremental exports.</dd>
+            <dt>Mac</dt>
+            <dd><strong>OK.</strong> Native app, but no date picker &mdash; you Shift+click entries manually to select a range.</dd>
+            <dt>Windows / Web</dt>
+            <dd><strong>Full only.</strong> No date filtering &mdash; every export is your entire journal.</dd>
+          </dl>
+          <p><strong>What this means for you:</strong></p>
+          <dl class="limitation-split">
+            <dt>Mac + iPhone</dt>
+            <dd>Smoothest combo &mdash; export from either device, probably just use Mac since it&rsquo;s right there.</dd>
+            <dt>Mac + Android</dt>
+            <dd>Similar &mdash; incremental from Android, full from Mac when needed.</dd>
+            <dt>Windows + iPhone</dt>
+            <dd>Export from your iPhone (incremental) &mdash; Windows can only do full re-exports.</dd>
+            <dt>Windows + Android</dt>
+            <dd>Export from your Android phone (incremental) &mdash; same idea.</dd>
+            <dt>Windows only</dt>
+            <dd>Works, but every export is the full journal. Fine to start; slower for ongoing updates.</dd>
           </dl>
           <details class="tech-details">
             <summary>Technical details</summary>
             <div class="tech-content">
-              <p>Day One's cloud backup lets you access your journal on multiple devices even on the free plan &mdash; but this project needs a JSON export file, not live access to Day One's cloud, so you'll export from whichever device you journal on. It's a one-tap process once set up. Windows+iPhone and Mac+iPhone are identical to each other for this; so are Windows+Android and Mac+Android &mdash; the desktop half of the pairing doesn't change anything.</p>
-              <p>On Mac and iOS, Day One lets you filter by date range or tag before exporting, so a partial export is genuinely possible. On Android, there's some ability to narrow things down, though it's less clearly documented. On Windows and the web app, Day One currently exports your entire journal only &mdash; there's no built-in way to export just a range of entries.</p>
-              <p>If you're on Windows or the web: your first export (and re-exports) will be your whole journal every time. This project hashes each entry and only re-processes ones that changed, so a repeated whole-journal export is still cheap and safe &mdash; it just means the export step itself takes a bit longer than a quick filtered one would.</p>
+              <p>This project needs a JSON export file from Day One. Day One syncs your journal across devices even on the free plan, so you can export from whichever device is most convenient.</p>
+              <p>On iPhone, Day One lets you filter by date range and by tag before exporting, making incremental exports (just the last week) fast and easy. Android offers date range filtering too. Mac has a native app but no date picker &mdash; you select entries manually. Windows and the web app currently export your entire journal only.</p>
+              <p>If you do re-export your whole journal: this project hashes each entry and only re-processes ones that changed, so a repeated full export is safe and cheap &mdash; it just means the export step itself takes longer than a quick filtered one would.</p>
             </div>
           </details>
         </div>
