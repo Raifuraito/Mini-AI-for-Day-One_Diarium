@@ -1147,6 +1147,10 @@
           <div class="num">Source available</div>
         </div>
       </div>
+      <details style="margin-top:18px;font-size:14px;color:var(--ink-soft,#6b6459);">
+        <summary style="cursor:pointer;font-style:italic;">Not a Day One or Diarium user? This might still work for you.</summary>
+        <p style="margin:8px 0 0;line-height:1.6;">The pipeline under the hood &mdash; embed text, store it locally, retrieve the relevant pieces, ask an LLM &mdash; doesn't care where the text came from. If you journal in another app (Notion, Obsidian, Apple Notes, Google Keep, Penzu, Journey, Grid Diary, or even plain text files) and can export your entries as JSON or plain text, the retrieval and chat layers would work with it. It's not a polished integration the way Day One is, but if you're comfortable adapting code, the bones are there.</p>
+      </details>
     </div>
   </section>
 
@@ -1341,27 +1345,28 @@
       <div class="limitations-grid">
         <div class="limitation-card">
           <h3>If you use Day One</h3>
-          <p>Every platform can export, but not every platform can export <em>just the new entries</em>. That&rsquo;s the friction difference:</p>
+          <p style="background:#f5f0e8;border-left:3px solid #b8a88a;padding:10px 14px;font-size:13px;margin-bottom:14px;line-height:1.5;"><strong>There is no automatic sync.</strong> Because of limitations with Day One&rsquo;s export system, uploads can&rsquo;t be fully automatic. The closest thing: iPhone&rsquo;s date-range export + a one-tap Shortcut that drops it into your sync folder. About 10 seconds, and that&rsquo;s as seamless as it gets.</p>
+          <p>Every platform can export, but not every platform can export <em>just the new entries</em>:</p>
           <dl class="limitation-split">
             <dt>iPhone</dt>
-            <dd><strong>Best.</strong> Date range + tag filtering &mdash; export just this week&rsquo;s entries in one tap.</dd>
+            <dd><strong>Best.</strong> Date range + tag filtering &mdash; export just entries since your last export.</dd>
             <dt>Android</dt>
-            <dd><strong>Good.</strong> Date range filtering &mdash; similar to iPhone for incremental exports.</dd>
+            <dd><strong>Good.</strong> Date range filtering &mdash; export a specific range of entries.</dd>
             <dt>Mac</dt>
-            <dd><strong>OK.</strong> Native app, but no date picker &mdash; you Shift+click entries manually to select a range.</dd>
+            <dd><strong>OK.</strong> Tag filtering + manual Cmd/Shift+click in list view to select entries &mdash; no date range picker.</dd>
             <dt>Windows / Web</dt>
-            <dd><strong>Full only.</strong> No date filtering &mdash; every export is your entire journal.</dd>
+            <dd><strong>Full only.</strong> No filtering at all &mdash; every export is your entire journal. (Export is in Journal Settings, not the main app settings.)</dd>
           </dl>
           <p><strong>What this means for you:</strong></p>
           <dl class="limitation-split">
             <dt>Mac + iPhone</dt>
-            <dd>Smoothest combo &mdash; export from either device, probably just use Mac since it&rsquo;s right there.</dd>
+            <dd>Smoothest combo. iPhone for quick date-range exports (since last time), Mac when you need a full export or want to hand-pick entries. Day-to-day, mostly export from your iPhone.</dd>
             <dt>Mac + Android</dt>
-            <dd>Similar &mdash; incremental from Android, full from Mac when needed.</dd>
+            <dd>Similar &mdash; date-range exports from Android for ongoing updates, Mac for a full export when needed.</dd>
             <dt>Windows + iPhone</dt>
-            <dd>Export from your iPhone (incremental) &mdash; Windows can only do full re-exports.</dd>
+            <dd>Your iPhone is your best friend &mdash; Windows can only do full re-exports, so export from iPhone for ongoing use.</dd>
             <dt>Windows + Android</dt>
-            <dd>Export from your Android phone (incremental) &mdash; same idea.</dd>
+            <dd>Same idea &mdash; date-range exports from Android, since Windows can&rsquo;t filter at all.</dd>
             <dt>Windows only</dt>
             <dd>Works, but every export is the full journal. Fine to start; slower for ongoing updates.</dd>
           </dl>
@@ -1369,7 +1374,7 @@
             <summary>Technical details</summary>
             <div class="tech-content">
               <p>This project needs a JSON export file from Day One. Day One syncs your journal across devices even on the free plan, so you can export from whichever device is most convenient.</p>
-              <p>On iPhone, Day One lets you filter by date range and by tag before exporting, making incremental exports (just the last week) fast and easy. Android offers date range filtering too. Mac has a native app but no date picker &mdash; you select entries manually. Windows and the web app currently export your entire journal only.</p>
+              <p>On iPhone, Day One lets you set a date range and filter by tag before exporting &mdash; so you can export just entries since your last export. Android offers date range filtering too. On Mac, there&rsquo;s no date picker, but you can filter by tag and manually select entries in list view (Cmd+click or Shift+click) then right-click &rarr; Export. Windows and the web app export your entire journal only &mdash; the option is under Edit Journal &rarr; Journal Settings, not the main app settings.</p>
               <p>If you do re-export your whole journal: this project hashes each entry and only re-processes ones that changed, so a repeated full export is safe and cheap &mdash; it just means the export step itself takes longer than a quick filtered one would.</p>
             </div>
           </details>

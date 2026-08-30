@@ -40,25 +40,29 @@ It also has **best-effort, not-fully-verified** support for **Diarium** exports,
 
 If you don't journal digitally in a format this can read, this project won't be useful to you as-is.
 
+**Not a Day One or Diarium user?** The underlying pipeline (embed text, store it locally, retrieve relevant pieces, send them to an LLM) doesn't actually care where the text came from. If you journal in another app — Notion, Obsidian, Apple Notes, Google Keep, Penzu, Journey, Grid Diary, or even just plain text files — and can export your entries as JSON or plain text, the retrieval and chat layers would work with it. It's not a polished, tested integration the way Day One is, but if you're comfortable adapting code, the bones are there.
+
 ### How to get your journal export into this project
 
 **If you use Day One:** this project needs a JSON export file. Day One lets you export from every platform, but **not every platform is equal** — the key difference is whether you can export *just the new entries* (incremental) or have to re-export *your entire journal* every time:
 
-| Platform | Date-range filter? | Incremental export? | Notes |
-|---|---|---|---|
-| **iPhone** | ✅ Date range + tag filter | ✅ Yes — export just this week/month | Best export experience overall |
-| **Android** | ✅ Date range filter | ✅ Yes — export a date range | Good — similar to iPhone |
-| **Mac** | ⚠️ Manual (Shift+click entries) | ⚠️ Possible but manual | Native app, no date picker |
-| **Windows / Web** | ❌ No | ❌ Full journal only | Functional but no filtering |
+| Platform | What you can filter | Best for |
+|---|---|---|
+| **iPhone** | ✅ Date range + tag filter | Best — set a date range, export just the new stuff |
+| **Android** | ✅ Date range filter | Good — similar to iPhone, no tag filter |
+| **Mac** | ⚠️ Tag filter + manual Cmd/Shift+click in list view | OK for selective exports, but no date range picker |
+| **Windows / Web** | ❌ No filtering — full journal only | Gets the job done, but every export is everything |
 
-**Why this matters:** if you journal every day and want to update weekly, exporting your entire 1,000+ entry journal each time is slow and wasteful. Incremental export (just the last week's entries) is much faster — and only your phone can do that easily.
+> **There is no automatic sync.** Because of limitations with Day One's (and Diarium's) export system, there's no way to make uploads fully automatic. The closest thing is iPhone's date-range export — set it to "since your last export," save it to your sync folder with a [one-tap Shortcut](#getting-exports-there-without-touching-a-cable), and you're done in about 10 seconds. That's as seamless as it gets.
+
+**Why this matters:** if you journal every day and want to update weekly, re-exporting your entire 1,000+ entry journal each time is slow. Your phone is the fastest way to do ongoing updates, since it's the only device that lets you export just the new entries by date range.
 
 **What this means for your setup:**
 
-- **Mac + iPhone**: the smoothest combo. Export from either — Mac's native app for a full export when you need one, iPhone for quick incremental updates. You'll probably just use the Mac since it's right there.
-- **Mac + Android**: similar story. Quick incremental exports from your Android phone, full exports from Mac when needed.
+- **Mac + iPhone**: the smoothest combo. Use your iPhone for quick date-range exports (just the entries since last time), and Mac when you need a full export or want to hand-pick specific entries. Day-to-day, you'll mostly export from your iPhone.
+- **Mac + Android**: similar — quick date-range exports from Android for ongoing updates, Mac for a full export when you need one.
 - **Windows + iPhone**: your iPhone is your best friend here. Windows can only do full re-exports, so for ongoing use, export from your iPhone using the [Apple Shortcut](#getting-exports-there-without-touching-a-cable) below — one tap and it lands in your sync folder.
-- **Windows + Android**: same idea — export from your Android phone for incremental updates, since Windows can't filter by date.
+- **Windows + Android**: same idea — export from your Android phone for date-range updates, since Windows can't filter at all.
 - **Windows only (no phone app)**: workable, but every export is the full journal. Fine for getting started; just slower for ongoing updates.
 
 Regardless of which device you export from, the steps are the same: export as **JSON**, save the `.zip` into your **sync folder**, and `watcher.py` picks it up automatically.
@@ -69,7 +73,7 @@ Regardless of which device you export from, the steps are the same: export as **
 
 **We don't take a cut.** This project is free to use -- the only cost is what the AI provider you choose charges you directly for their API, and if you're running a local model (Ollama, LM Studio, etc.), that cost is zero beyond your own electricity. Running a local model privately is only recommended if you have enough RAM to host one (usually 16 GB+).
 
-Nothing here requires a subscription. This project works with several AI providers now (Anthropic, OpenAI, Google, Mistral, or a local model -- pick one in the setup wizard's Step 2), and what it costs is small, pay-as-you-go usage of whichever one you choose.
+Nothing here requires a subscription. This project works with several AI providers now (Anthropic, OpenAI, Google, Mistral, or a local model via Ollama, LM Studio, llama.cpp, or any OpenAI-compatible local server -- pick one in the setup wizard's Step 2), and what it costs is small, pay-as-you-go usage of whichever hosted provider you choose. If you run a local model instead, the cost is zero beyond your own electricity -- everything stays on your machine and no API calls are made.
 
 - **Setting up and running the app itself**: free. Flask, the vector database, and the web page all run locally with no cost.
 - **Embedding your journal into the local database**: free. This uses a local model, not an API call.
@@ -154,20 +158,27 @@ That's it for this page. It writes everything into a file called `.env` inside t
 
 ### Exporting from a computer
 
-**Day One (Mac/Windows app):** Journal Settings → Export Journal → choose **JSON** (check "include media" if you want photo search) → save the file into the export folder you set up in Step 2.
+**Day One (Mac app):** right-click your journal in the sidebar → Export → choose **JSON** (check "include media" if you want photo search) → save the file into the export folder you set up in Step 2. You can also select specific entries first (switch to List view, Cmd+click or Shift+click to select) and right-click → Export to export just those.
+
+**Day One (Windows / Web app):** click your journal → Edit Journal → Journal Settings → Export Journal → choose **JSON** → save the file into the export folder you set up in Step 2. Note: Windows and Web can only export the full journal — there's no way to filter by date or select specific entries.
 
 **Diarium:** use Diarium's own JSON export option from its settings/backup menu, and save it into the same folder. See the [Known limitations](#known-limitations-please-read-this-section) section for what "best-effort support" means for Diarium specifically, before relying on this.
 
 ### Exporting from a phone (iOS/Android)
 
-**Day One app:**
+**Day One on iPhone:**
 
-1. Open Day One on your phone.
-2. Go to **Settings**.
-3. Tap **Import/Export**.
-4. Tap **Export**, then choose **JSON**.
-5. Wait for the export to finish -- Day One will show a notification when it's ready.
-6. Tap **Share**, then choose where to send it. If you've set up the synced-folder approach below, save it there directly; otherwise, save it to Files (iOS) or your Downloads (Android) and move it to your computer's export folder afterward (e.g. by AirDrop, email to yourself, or a cloud drive app).
+1. Open Day One → **Settings** → **Import/Export**.
+2. Select your journal, then **set a date range** (e.g. "since last export" or "last week") so you're only exporting the new entries, not the whole journal every time. You can also filter by tag if you want.
+3. Choose **JSON**, then tap **Export**.
+4. When it's ready, tap **Share** → save it to your sync folder directly (or use the [Apple Shortcut](#getting-exports-there-without-touching-a-cable) below for a one-tap version).
+
+**Day One on Android:**
+
+1. Open Day One → **Settings** → **Export**.
+2. Choose your journal and set a date range to export just the recent entries.
+3. Choose **JSON** and export.
+4. Save the file to your sync folder (e.g. Google Drive, Dropbox), or move it to your computer's export folder manually.
 
 **Diarium app:** the exact menu wording varies by version, but look for an **Export** or **Backup** option in Diarium's settings, and choose the JSON format if offered (Diarium's primary backup format is a proprietary `.diary` file, not JSON -- make sure you're specifically choosing a JSON export, not the regular backup, since only JSON is what this project can read).
 
