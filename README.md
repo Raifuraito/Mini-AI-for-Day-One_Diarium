@@ -67,7 +67,7 @@ Regardless of which device you export from, the steps are the same: export as **
 
 ## What this actually costs
 
-**We don't take a cut.** This project is free and open-source -- the only cost is what the AI provider you choose charges you directly for their API, and if you're running a local model (Ollama, LM Studio, etc.), that cost is zero beyond your own electricity. Running a local model privately is only recommended if you have enough RAM to host one (usually 16 GB+).
+**We don't take a cut.** This project is free to use -- the only cost is what the AI provider you choose charges you directly for their API, and if you're running a local model (Ollama, LM Studio, etc.), that cost is zero beyond your own electricity. Running a local model privately is only recommended if you have enough RAM to host one (usually 16 GB+).
 
 Nothing here requires a subscription. This project works with several AI providers now (Anthropic, OpenAI, Google, Mistral, or a local model -- pick one in the setup wizard's Step 2), and what it costs is small, pay-as-you-go usage of whichever one you choose.
 
@@ -516,10 +516,10 @@ journal-rag/
 │   └── test_normalize_entries.py   # Automated tests for the export-format parsing
 ├── .env                       # Your API key + paths (created by setup_wizard.py, gitignored)
 ├── .gitignore                 # Keeps your journal data and secrets out of git
-├── LICENSE                    # MIT
+├── LICENSE                    # Free personal use; see file for terms
 └── SECURITY.md                # Full details on data handling and network exposure
 ```
 
 ## License
 
-[MIT](LICENSE) -- do what you like with it.
+Free for personal use; nonprofits just need to give credit; commercial use requires permission. See [LICENSE](LICENSE) for the full terms.

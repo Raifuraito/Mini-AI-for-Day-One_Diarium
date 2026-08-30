@@ -881,7 +881,7 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
   <form method="POST" action="/save">
     <h2>Step 2: Your AI provider</h2>
     <div class="banner warn">
-      <strong>This app is free and open-source, and we don't earn anything from it.</strong>
+      <strong>This app is free to use, and we don't earn anything from it.</strong>
       Using it isn't free, though: asking questions and tagging entries call whichever
       provider you pick below, and <strong>that provider bills you directly</strong> &mdash;
       every dollar goes to them, none to us.
