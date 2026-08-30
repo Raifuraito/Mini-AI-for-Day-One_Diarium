@@ -21,6 +21,7 @@ This guide assumes no prior context. If you've never written a line of code, you
 - [Step 4: Bring your journal in](#step-4-bring-your-journal-in)
 - [Step 5: Start asking questions](#step-5-start-asking-questions)
 - [Using it from your phone](#using-it-from-your-phone)
+- [Optional: use it from your phone without your computer on](#optional-use-it-from-your-phone-without-your-computer-on)
 - [Keeping it up to date automatically](#keeping-it-up-to-date-automatically)
 - [Tags and Max Recall, explained](#tags-and-max-recall-explained)
 - [Photo search (optional)](#photo-search-optional)
@@ -220,9 +221,146 @@ The web app above only listens on your own computer by default. To reach it from
 2. Sign in with the same account on both.
 3. Make sure `python server.py` (from Step 5) is running on your computer.
 4. On your phone, open `http://<your-computer-tailscale-name>:5000` in a browser (Tailscale's app shows you this name).
-5. Tap Share → Add to Home Screen for a full-screen app icon, so it behaves like a normal app from then on.
+5. Save it to your home screen so it works like a regular app:
+
+   **iPhone:** tap the Share button (the square with an arrow) → scroll down → **Add to Home Screen** → tap **Add**.
+
+   **Android:** tap the three-dot menu (⋮) in your browser → **Add to Home screen** (or **Install app**, depending on your browser) → tap **Add**.
+
+   Either way, you get a full-screen app icon with no browser bar — it looks and feels like a native app.
 
 **Important:** there is no login or password on this app. Tailscale is what keeps it private -- it only makes the app reachable to your own signed-in devices, not the open internet. See [Privacy and security](#privacy-and-security) for what this means if you ever consider exposing it any other way (short version: don't port-forward it).
+
+## Optional: use it from your phone without your computer on
+
+The setup above works great, but it requires your computer to be on and running the server. If you want to use the journal app from your phone even when your computer is off — say, while you're traveling or just don't want to leave a machine running — you can host it on a cheap VPS (Virtual Private Server) for about **$11/year** (~$0.94/month).
+
+This is entirely optional. The normal setup (your computer + Tailscale) is simpler and costs nothing extra. This section is for people who want 24/7 phone access without thinking about whether their computer is on.
+
+### What you're paying for
+
+A VPS is just a small Linux computer in a data center that stays on all the time. [RackNerd](https://www.racknerd.com) sells them starting at **$11.29/year** — that gets you 1 GB RAM, 24 GB storage, and 2 TB bandwidth, which is far more than this project needs. The $11/year is the only extra cost; you're still paying the same API costs as before for the AI models, and that money still goes directly to your AI provider, not to us.
+
+### Step-by-step setup
+
+This assumes you've never used a VPS before. You'll be typing commands into a black terminal window — the same kind of thing you did to run `ingest.py`, just on a remote computer instead of your own.
+
+**1. Buy the VPS**
+
+Go to [RackNerd](https://www.racknerd.com) (or any similar provider — DigitalOcean, Vultr, Hetzner all work too, just at higher prices) and pick their cheapest annual KVM VPS plan. Choose **Ubuntu 22.04** (or newer) as the operating system. You'll get an email with an IP address, a username (`root`), and a password.
+
+**2. Connect to it**
+
+Open a terminal on your computer:
+- **Windows:** open PowerShell and type: `ssh root@YOUR_VPS_IP`
+- **Mac:** open Terminal and type: `ssh root@YOUR_VPS_IP`
+
+Type `yes` when it asks about the fingerprint, then enter the password from the email. You're now typing commands on the VPS, not your own computer.
+
+**3. Install what the project needs**
+
+Copy and paste these lines one at a time (or all at once — they'll run in order):
+
+```bash
+apt update && apt upgrade -y
+apt install -y python3 python3-pip python3-venv git
+```
+
+**4. Get the project onto the VPS**
+
+```bash
+cd /opt
+git clone https://github.com/YOUR_USERNAME/journal-rag.git
+cd journal-rag
+python3 -m venv venv
+source venv/bin/activate
+pip install flask chromadb anthropic
+```
+
+Replace `YOUR_USERNAME/journal-rag` with your actual GitHub repo URL (the same one you push to).
+
+**5. Copy your data to the VPS**
+
+You need two things from your local computer: your `.env` file (has your API key and settings) and your `chroma_db/` folder (your journal's database). From a terminal **on your own computer** (not the VPS):
+
+```bash
+scp .env root@YOUR_VPS_IP:/opt/journal-rag/
+scp -r chroma_db root@YOUR_VPS_IP:/opt/journal-rag/
+```
+
+If you also use photo search, copy the `photos/` folder the same way.
+
+**6. Install Tailscale on the VPS**
+
+This keeps the journal app private — only your devices can reach it, same as the local setup:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+tailscale up
+```
+
+It will print a URL. Open that URL in your browser and sign in with the **same Tailscale account** you use on your phone and computer. Once it says "connected," the VPS is on your private Tailscale network.
+
+Find the VPS's Tailscale name:
+
+```bash
+tailscale status
+```
+
+You'll see something like `100.x.x.x  your-vps-name`. That name is what you'll use from your phone.
+
+**7. Make the server start automatically**
+
+Create a systemd service so the app runs on its own, even after a reboot:
+
+```bash
+cat > /etc/systemd/system/journal-rag.service << 'EOF'
+[Unit]
+Description=Journal RAG Web App
+After=network.target tailscaled.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/journal-rag/webapp
+ExecStart=/opt/journal-rag/venv/bin/python server.py
+Restart=always
+RestartSec=5
+EnvironmentFile=/opt/journal-rag/.env
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable journal-rag
+systemctl start journal-rag
+```
+
+**8. Open it on your phone**
+
+On your phone (with Tailscale running), open a browser and go to:
+
+```
+http://your-vps-tailscale-name:5000
+```
+
+Then save it to your home screen the same way as described in the section above — Share → Add to Home Screen on iPhone, or three-dot menu → Add to Home screen on Android.
+
+### Keeping the VPS copy up to date
+
+When you export new journal entries, you'll still do the ingest on your own computer (where `watcher.py` is running). Then re-copy the updated database to the VPS:
+
+```bash
+scp -r chroma_db root@YOUR_VPS_IP:/opt/journal-rag/
+```
+
+Then restart the server on the VPS so it picks up the new data:
+
+```bash
+ssh root@YOUR_VPS_IP "systemctl restart journal-rag"
+```
+
+Or, if you want to get fancy, you could set up a cron job or script to do this automatically — but for most people, running those two commands after a new export is simple enough.
 
 ## Keeping it up to date automatically
 
@@ -335,7 +473,9 @@ This project is built and maintained by one person for personal use, and shared 
 
 ## Privacy and security
 
-Your journal stays on your computer. The only things that ever leave it are: the specific excerpts relevant to whatever question you just asked (sent to your chosen AI provider's API to generate the answer), and short snippets of each entry at tagging time (sent the same way, to extract that entry's tags). If you're using a local model (Ollama, LM Studio, etc.), nothing leaves your computer at all. Nothing else -- not your whole journal, not your photos in bulk, nothing -- is ever uploaded anywhere.
+Your journal stays on your computer. The only things that ever leave it are: the specific excerpts relevant to whatever question you just asked (sent to your AI provider's API to generate the answer), and short snippets of each entry at tagging time (sent the same way, to extract that entry's tags). Nothing else -- not your whole journal, not your photos in bulk, nothing -- is ever uploaded anywhere by this project.
+
+**One thing to be straightforward about:** if you use a hosted API provider (Anthropic, OpenAI, Google, Mistral), those excerpts *are* being sent to that company's servers to generate the answer. That's how hosted AI APIs work -- it's the same thing that happens when you type a question into ChatGPT or Claude.ai, but it's worth being aware of. Each provider has their own data-handling and retention policies; check theirs if this matters to you. **If you want nothing to leave your computer at all, use a local model** (Ollama, LM Studio, or another local option) -- with a local model, every part of the pipeline runs entirely on your own hardware and no journal content is ever sent anywhere. That's the trade-off: hosted models are easier to set up and generally smarter, local models keep everything private but need a decent computer (16 GB+ RAM recommended).
 
 **Your API key** is either stored in a local `.env` file (created by the setup wizard) or in your own computer's environment variables -- never hardcoded anywhere in the code, and never sent anywhere except as authentication when this project itself calls your chosen provider's API on your behalf. The `.env` file is already excluded from git via `.gitignore`, so it can't end up on GitHub by accident if you ever push your own changes to a repo. If a key is ever accidentally exposed, revoke it immediately on your provider's console and issue a new one.
 
