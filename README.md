@@ -9,7 +9,7 @@ This guide assumes no prior context. If you've never written a line of code, you
 ## Table of contents
 
 - [Is this for you?](#is-this-for-you)
-  - [If you journal on your phone: which combo is easiest?](#if-you-journal-on-your-phone-which-combo-is-easiest)
+  - [How to get your journal export into this project](#how-to-get-your-journal-export-into-this-project)
 - [What this actually costs](#what-this-actually-costs)
 - [Before you start: what you'll need](#before-you-start-what-youll-need)
 - [Step 1: Download and open the folder](#step-1-download-and-open-the-folder)
@@ -39,19 +39,18 @@ It also has **best-effort, not-fully-verified** support for **Diarium** exports,
 
 If you don't journal digitally in a format this can read, this project won't be useful to you as-is.
 
-### If you journal on your phone: which combo is easiest?
+### How to get your journal export into this project
 
-**If you use Day One:** what actually determines the effort here is which *phone* you have, not which computer you pair it with. Day One's own real-time Sync between devices is a paid Silver/Gold feature ($49.99-$74.99/year) -- if you're using a free, self-hosted tool specifically to avoid subscription costs, you're probably not also paying for that, which means your phone is the one place your entries and photos actually live, and getting a fresh export means going back to the phone every time, regardless of which desktop you're pairing it with.
+**If you use Day One:** this project needs a JSON export file. Day One lets you export from every platform — Mac, Windows, iPhone, Android, and the web app — so you can do it from whichever device is most convenient. The steps are the same everywhere:
 
-| | iPhone | Android |
-|---|---|---|
-| Getting the export into your synced folder | A one-time ~2-minute [Apple Shortcut](#getting-exports-there-without-touching-a-cable) bridges Day One's share sheet into it | The share sheet already targets Dropbox/Drive directly -- no bridge needed |
-| Ongoing effort, once that's set up | One tap | One tap |
-| Changes with Windows vs. Mac? | No -- both run every major cloud provider's desktop app identically | No |
+1. Open Day One → **Settings** (or **File → Export** on Mac) → **Export** → **JSON**
+2. Save the `.zip` file into the **sync folder** you set up in the wizard (e.g. your Dropbox, iCloud Drive, OneDrive, or Google Drive folder)
 
-Windows+iPhone and Mac+iPhone are identical to each other here, and Windows+Android and Mac+Android are identical to each other -- the desktop half of the pairing doesn't actually change anything. If you're on Android, you're already in the easier spot; if you're on iPhone, the Shortcut above is genuinely a one-time cost, not an ongoing one.
+That's it — `watcher.py` picks it up from there automatically.
 
-**If you use Diarium:** the friction isn't about exporting at all -- Diarium already syncs continuously through your own cloud folder, so there's no phone-to-computer file dance the way there is with Day One. The catch is that Cloud Sync is a separate paid upgrade *on each platform* (the Windows app ships with it included; iPhone, Android, and Mac each need their own purchase to unlock it), and Google Drive specifically is the slowest of Diarium's supported cloud backends, if you have a choice of provider.
+**Exporting from your computer** (Mac or Windows) is the easiest path, since you can save the `.zip` directly into your sync folder in one step. **Exporting from your phone** works too — on Android the share sheet can target your cloud folder directly; on iPhone you can either share into your cloud app (Files → iCloud/Dropbox) or use a quick [Apple Shortcut](#getting-exports-there-without-touching-a-cable) to bridge Day One's share sheet into your sync folder.
+
+**If you use Diarium:** the friction isn't about exporting at all — Diarium already syncs continuously through your own cloud folder, so there's no export-and-reupload dance. The catch is that Cloud Sync is a separate paid upgrade *on each platform* (the Windows app ships with it included; iPhone, Android, and Mac each need their own purchase to unlock it), and Google Drive specifically is the slowest of Diarium's supported cloud backends, if you have a choice of provider.
 
 ## What this actually costs
 
@@ -223,13 +222,17 @@ The wizard's **"Sync folder (drop zone)"** field doesn't have to be a plain loca
 
 **Need to change this later?** Click the &#9881; Settings icon in the main journal app's header — it opens the wizard right where you left off, with your API key already filled in (you don't need to re-enter it unless you're actually replacing it).
 
-**Day One on iPhone, via Apple Shortcuts:** Day One's own export can't write directly into an arbitrary folder, but a two-action Shortcut bridges that gap. In the Shortcuts app:
+**Day One on iPhone, via Apple Shortcuts:** if you want a one-tap "export and save" flow from your phone, here's how to set it up (about 2 minutes, one time):
 
-1. Create a new shortcut, set its type to accept files from the Share Sheet (Shortcut Details → "Show in Share Sheet," with Share Sheet Types set to "Files").
-2. Add one action: **Save File** — when you run it, tap the folder icon and pick the *same* cloud-sync folder you set as your export folder above (this is a one-time choice; the Shortcut remembers it).
-3. From Day One: Settings → Export → PDF/JSON → Share → find your Shortcut in the share sheet.
+1. Open the **Shortcuts** app on your iPhone.
+2. Tap **+** to create a new shortcut. Give it a name like "Export Journal."
+3. Tap the **ⓘ** (details) button at the top → turn on **"Show in Share Sheet"** → set **Share Sheet Types** to **"Files"**.
+4. Add one action: search for **"Save File"** and add it. Tap the folder icon inside it and pick the *same* cloud-sync folder you set as your sync folder in the wizard (e.g. your Dropbox or iCloud Drive folder). This is a one-time choice — the Shortcut remembers it.
+5. Tap **Done**. The Shortcut is ready.
 
-That's the whole Shortcut — two steps, no scripting. (There isn't a pre-built one-click file to import here: Apple's Shortcuts format doesn't have a reliable way to hand someone a working file sight-unseen, and testing one blind on hardware I don't have access to isn't something to guess at. Building it yourself in the app, from the three steps above, takes about the same two minutes either way.)
+**To use it:** Open Day One → **Settings** → **Export** → choose **JSON** → tap **Share** → find your "Export Journal" Shortcut in the share sheet. One tap, and the `.zip` lands in your sync folder.
+
+You only need this if you're exporting from your iPhone specifically. If you export from Mac, Windows, or the web app, you can save the file directly into your sync folder without any Shortcut.
 
 ### Manual fallback
 
