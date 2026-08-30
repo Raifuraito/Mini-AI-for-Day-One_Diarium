@@ -1,4 +1,4 @@
-# Ask Your Journal
+# Mini AI for Day One & Diarium
 
 A private, local AI assistant for your journal. Ask it questions in plain English -- *"What was I feeling last spring?"*, *"Detail my trip to California"*, *"What have I not reflected on in a while?"* -- and it searches your actual entries (and photos) to answer, the same way you'd ask a friend who'd read the whole thing.
 
@@ -281,22 +281,22 @@ apt install -y python3 python3-pip python3-venv git
 
 ```bash
 cd /opt
-git clone https://github.com/YOUR_USERNAME/journal-rag.git
-cd journal-rag
+git clone https://github.com/YOUR_USERNAME/Mini-AI-for-Day-One_Diarium.git
+cd Mini-AI-for-Day-One_Diarium
 python3 -m venv venv
 source venv/bin/activate
 pip install flask chromadb anthropic
 ```
 
-Replace `YOUR_USERNAME/journal-rag` with your actual GitHub repo URL (the same one you push to).
+Replace `YOUR_USERNAME/Mini-AI-for-Day-One_Diarium` with your actual GitHub repo URL (the same one you push to).
 
 **5. Copy your data to the VPS**
 
 You need two things from your local computer: your `.env` file (has your API key and settings) and your `chroma_db/` folder (your journal's database). From a terminal **on your own computer** (not the VPS):
 
 ```bash
-scp .env root@YOUR_VPS_IP:/opt/journal-rag/
-scp -r chroma_db root@YOUR_VPS_IP:/opt/journal-rag/
+scp .env root@YOUR_VPS_IP:/opt/mini-ai-journal/
+scp -r chroma_db root@YOUR_VPS_IP:/opt/mini-ai-journal/
 ```
 
 If you also use photo search, copy the `photos/` folder the same way.
@@ -325,26 +325,26 @@ You'll see something like `100.x.x.x  your-vps-name`. That name is what you'll u
 Create a systemd service so the app runs on its own, even after a reboot:
 
 ```bash
-cat > /etc/systemd/system/journal-rag.service << 'EOF'
+cat > /etc/systemd/system/mini-ai-journal.service << 'EOF'
 [Unit]
-Description=Journal RAG Web App
+Description=Mini AI for Day One & Diarium
 After=network.target tailscaled.service
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/journal-rag/webapp
-ExecStart=/opt/journal-rag/venv/bin/python server.py
+WorkingDirectory=/opt/mini-ai-journal/webapp
+ExecStart=/opt/mini-ai-journal/venv/bin/python server.py
 Restart=always
 RestartSec=5
-EnvironmentFile=/opt/journal-rag/.env
+EnvironmentFile=/opt/mini-ai-journal/.env
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable journal-rag
-systemctl start journal-rag
+systemctl enable mini-ai-journal
+systemctl start mini-ai-journal
 ```
 
 **8. Open it on your phone**
@@ -362,13 +362,13 @@ Then save it to your home screen the same way as described in the section above 
 When you export new journal entries, you'll still do the ingest on your own computer (where `watcher.py` is running). Then re-copy the updated database to the VPS:
 
 ```bash
-scp -r chroma_db root@YOUR_VPS_IP:/opt/journal-rag/
+scp -r chroma_db root@YOUR_VPS_IP:/opt/mini-ai-journal/
 ```
 
 Then restart the server on the VPS so it picks up the new data:
 
 ```bash
-ssh root@YOUR_VPS_IP "systemctl restart journal-rag"
+ssh root@YOUR_VPS_IP "systemctl restart mini-ai-journal"
 ```
 
 Or, if you want to get fancy, you could set up a cron job or script to do this automatically — but for most people, running those two commands after a new export is simple enough.
@@ -409,7 +409,7 @@ Leave that running in a terminal window, and it checks for new exports every 60 
 ```bash
 crontab -e
 # Add this line, then save and close:
-0 8 * * * cd /path/to/journal-rag && python3 ingest.py >> ingest.log 2>&1
+0 8 * * * cd /path/to/Mini-AI-for-Day-One_Diarium && python3 ingest.py >> ingest.log 2>&1
 ```
 
 **Windows (Task Scheduler), ingest.py only:** open Task Scheduler → Create Basic Task → Daily → have it run `python.exe` with the argument `ingest.py`, and set "Start In" to this project's folder.
@@ -417,9 +417,9 @@ crontab -e
 **Windows (Task Scheduler), auto-starting `watcher.py` itself:** this is a *different* recipe from the one above -- that one schedules `ingest.py` alone, on a daily timer. `watcher.py` needs to start once and then keep running continuously, so it needs an **At log on** trigger, not Daily -- a Daily trigger will only ever fire once at a fixed clock time, which looks like "it just doesn't start" if you're not at your computer then.
 
 1. Open Task Scheduler → Action → Create Task... (not "Create Basic Task" this time -- the basic wizard doesn't expose the trigger type this needs).
-2. **General tab:** name it (e.g. "Journal-Rag Watcher"). Under "Security options," select "Run whether user is logged on or not" only if you want it fully invisible; "Run only when user is logged on" is simpler and fine for personal use.
+2. **General tab:** name it (e.g. "MiniAI for DayOne & Diarium Watcher"). Under "Security options," select "Run whether user is logged on or not" only if you want it fully invisible; "Run only when user is logged on" is simpler and fine for personal use.
 3. **Triggers tab** → New... → "Begin the task" dropdown → **At log on** → OK.
-4. **Actions tab** → New... → Program/script: the *full path* to your `python.exe` (not just `python` -- Task Scheduler doesn't always search the same PATH a regular terminal does). Not sure of that path? Open a terminal in this project's folder and run `where python` -- use the first line it prints. Add arguments: `watcher.py`. Start in: this project's folder (e.g. `C:\Projects\journal-rag`).
+4. **Actions tab** → New... → Program/script: the *full path* to your `python.exe` (not just `python` -- Task Scheduler doesn't always search the same PATH a regular terminal does). Not sure of that path? Open a terminal in this project's folder and run `where python` -- use the first line it prints. Add arguments: `watcher.py`. Start in: this project's folder (e.g. `C:\Projects\Mini-AI-for-Day-One_Diarium`).
 5. Save, entering your Windows password if prompted.
 
 Test it with a log-off/log-on (or right-click the task → Run), then check Task Scheduler's "Last Run Result" column -- anything other than `(0x0)` or blank means it didn't actually start; the most common causes are exactly the two things step 4 calls out (a relative `python` instead of the full path, and the wrong trigger type).
@@ -506,7 +506,7 @@ Full details live in [SECURITY.md](SECURITY.md).
 ## Project structure
 
 ```
-journal-rag/
+Mini-AI-for-Day-One_Diarium/
 ├── start_setup.bat          # Windows: double-click this first
 ├── start_setup.command      # Mac: double-click this first
 ├── setup_wizard.py          # The setup page these launchers open

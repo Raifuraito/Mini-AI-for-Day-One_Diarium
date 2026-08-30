@@ -15,7 +15,7 @@ the default to "on" without a test failure catching it first.
 
 How to run this:
 
-    cd journal-rag              (the project's root folder)
+    cd Mini-AI-for-Day-One_Diarium              (the project's root folder)
     python3 -m unittest tests.test_tagging_opt_in -v
 
 No API key or internet connection needed -- this only tests how the

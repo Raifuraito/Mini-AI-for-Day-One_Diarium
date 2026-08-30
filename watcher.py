@@ -3,7 +3,7 @@ import sys
 import subprocess
 import time
 
-# Resolves to wherever THIS file lives -- so moving the whole journal-rag
+# Resolves to wherever THIS file lives -- so moving the whole Mini-AI-for-Day-One_Diarium
 # folder never requires touching this again.
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 

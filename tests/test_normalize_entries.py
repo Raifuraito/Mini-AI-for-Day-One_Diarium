@@ -15,7 +15,7 @@ can't reintroduce either one without a test failure catching it.
 
 How to run this:
 
-    cd journal-rag              (the project's root folder)
+    cd Mini-AI-for-Day-One_Diarium              (the project's root folder)
     python3 -m unittest tests.test_normalize_entries -v
 
 No sample export files, no API key, and no internet connection are needed

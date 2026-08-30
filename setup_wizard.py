@@ -295,7 +295,7 @@ def _register_autostart():
     watcher_path = os.path.join(_PROJECT_ROOT, "watcher.py")
 
     if sys.platform == "win32":
-        task_name = "Journal-Rag Watcher"
+        task_name = "MiniAI for DayOne & Diarium Watcher"
         tr_value = f'"{python_exe}" "{watcher_path}"'
         try:
             result = subprocess.run(
@@ -384,7 +384,7 @@ def _autostart_preview():
         return {
             "platform": "Windows",
             "method": "Task Scheduler",
-            "task_name": "Journal-Rag Watcher",
+            "task_name": "MiniAI for DayOne & Diarium Watcher",
             "trigger": "At log on (runs every time you sign into Windows)",
             "command": f'"{python_exe}" "{watcher_path}"',
             "note": "This creates a scheduled task that starts the watcher automatically whenever you log in. It replaces any existing task with the same name.",
