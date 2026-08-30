@@ -18,11 +18,11 @@ from datetime import datetime
 
 from flask import Flask, request, jsonify, render_template, send_from_directory
 import chromadb
-from anthropic import Anthropic
 
 # Reuse config + helpers from the parent pipeline
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
+import llm
 from ask import (
     retrieve_context, build_prompt, rough_token_estimate,
     is_visual_search_question, retrieve_visual_context, build_visual_prompt,
@@ -42,7 +42,6 @@ app.jinja_env.auto_reload = True
 
 _client = None
 _collection = None
-_anthropic_client = None
 
 # In-memory conversation history per session -- keeps the last N turns so
 # "tell me more about that" works. Keyed by session_id from the frontend.
@@ -146,13 +145,13 @@ def get_collection():
     return _collection
 
 
-def get_anthropic_client():
-    global _anthropic_client
-    if _anthropic_client is None:
-        if not config.ANTHROPIC_API_KEY:
-            raise RuntimeError("ANTHROPIC_API_KEY is not set.")
-        _anthropic_client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    return _anthropic_client
+def _require_llm():
+    """Raise a clear error if the active provider isn't configured yet."""
+    if not llm.is_configured():
+        raise RuntimeError(
+            f"No API key configured for {llm.provider_name()}. "
+            f"Run setup_wizard.py first."
+        )
 
 
 @app.route("/")
@@ -184,19 +183,12 @@ def ask():
     # Statement detection -- respond warmly instead of searching
     if is_statement(question):
         try:
-            client = get_anthropic_client()
+            _require_llm()
             statement_prompt = build_statement_prompt(question)
             messages = history + [{"role": "user", "content": statement_prompt}]
-            response = client.messages.create(
-                model=config.CLAUDE_MODEL,
-                max_tokens=200,
-                messages=messages,
-            )
+            answer, _usage = llm.chat(messages, max_tokens=200)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-        answer = "".join(
-            block.text for block in response.content if hasattr(block, "text")
-        )
         # Update conversation history with the original question and answer
         # NOT the internal prompt that contains old context blocks
         history = (history + [
@@ -222,20 +214,11 @@ def ask():
         visual_prompt = build_visual_prompt(question, visual_matches)
         est_tokens = rough_token_estimate(visual_prompt)
         try:
-            client = get_anthropic_client()
+            _require_llm()
             messages = history + [{"role": "user", "content": visual_prompt}]
-            response = client.messages.create(
-                model=config.CLAUDE_MODEL,
-                max_tokens=1000,
-                messages=messages,
-            )
+            answer, usage_info = llm.chat(messages, max_tokens=1000)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-        answer = "".join(
-            block.text for block in response.content if hasattr(block, "text")
-        )
-        usage = getattr(response, "usage", None)
-        usage_info = {"input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens} if usage else None
         sources = [
             {"date": date or "unknown", "photo": photo_id, "is_visual": True,
              "entry_id": entry_id or None}
@@ -267,27 +250,11 @@ def ask():
     est_tokens = rough_token_estimate(combined_prompt)
 
     try:
-        client = get_anthropic_client()
+        _require_llm()
         messages = history + [{"role": "user", "content": combined_prompt}]
-        response = client.messages.create(
-            model=config.CLAUDE_MODEL,
-            max_tokens=1000,
-            messages=messages,
-        )
+        answer, usage_info = llm.chat(messages, max_tokens=1000)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-    answer = "".join(
-        block.text for block in response.content if hasattr(block, "text")
-    )
-
-    usage = getattr(response, "usage", None)
-    usage_info = None
-    if usage:
-        usage_info = {
-            "input_tokens": usage.input_tokens,
-            "output_tokens": usage.output_tokens,
-        }
 
     if combined.get("low_confidence"):
         # build_combined_prompt() ignores chunks/photos entirely and tells

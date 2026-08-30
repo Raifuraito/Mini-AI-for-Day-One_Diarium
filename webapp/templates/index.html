@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Journal">
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Patrick+Hand&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --parchment: #FAF6EE;
@@ -97,6 +97,11 @@
     background: var(--parchment-line);
   }
 
+  #font-toggle {
+    font-weight: 600;
+    font-size: 11px;
+  }
+
   header .status {
     font-size: 12px;
     color: var(--warm-grey);
@@ -177,14 +182,46 @@
   }
 
   .row.journal .bubble {
-    font-family: 'Caveat', cursive;
-    font-weight: 500;
-    font-size: 20px;
-    line-height: 1.4;
     color: var(--ink);
     border-left: 2px solid var(--sage);
     padding-left: 14px;
     background: transparent;
+  }
+
+  /* Answer text and journal-excerpt text each get a font the viewer picks
+     independently in the font-settings modal (#font-modal-overlay below).
+     Bundled as family+weight+size+line-height together, not just family --
+     a script font like Caveat needs to run bigger than a plain serif to
+     stay legible, so swapping family alone and keeping one fixed size
+     would make "Plain text" look oversized or "Cursive" look cramped.
+     Shared across three kinds of elements (answer bubbles, carousel entry
+     text, and the live preview boxes in the settings modal) so the preview
+     always matches what you actually get. */
+  .bubble[data-font="handwritten"],
+  .carousel-text[data-font="handwritten"],
+  .font-preview-box[data-font="handwritten"] {
+    font-family: 'Caveat', cursive;
+    font-weight: 500;
+    font-size: 20px;
+    line-height: 1.4;
+  }
+
+  .bubble[data-font="neat"],
+  .carousel-text[data-font="neat"],
+  .font-preview-box[data-font="neat"] {
+    font-family: 'Patrick Hand', cursive;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 1.5;
+  }
+
+  .bubble[data-font="plain"],
+  .carousel-text[data-font="plain"],
+  .font-preview-box[data-font="plain"] {
+    font-family: 'Source Serif 4', serif;
+    font-weight: 400;
+    font-size: 15px;
+    line-height: 1.6;
   }
 
   .answer-line {
@@ -445,10 +482,6 @@
   }
 
   .carousel-text {
-    font-family: 'Caveat', cursive;
-    font-size: 20px;
-    font-weight: 500;
-    line-height: 1.5;
     color: var(--ink);
     white-space: pre-wrap;
   }
@@ -633,6 +666,68 @@
     font-style: italic;
   }
 
+  /* Font-settings modal (reuses the .entry-modal shell from the mood
+     chart / entry carousel, so it inherits the same bottom-sheet layout,
+     theming, and close/Escape behavior for free). */
+  .font-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--parchment-line);
+  }
+
+  .font-setting-row:last-of-type {
+    border-bottom: none;
+  }
+
+  .font-setting-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .font-setting-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+  }
+
+  .font-setting-sub {
+    font-size: 11.5px;
+    color: var(--warm-grey);
+    font-family: 'Inter', sans-serif;
+  }
+
+  .font-select {
+    background: var(--field-surface);
+    border: 1px solid var(--parchment-line);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    flex-shrink: 0;
+  }
+
+  .font-preview-hint {
+    margin: 18px 0 8px;
+    font-size: 11px;
+    color: var(--warm-grey);
+    font-family: 'Inter', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .font-preview-box {
+    padding: 10px 12px;
+    border-left: 2px solid var(--sage);
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .thinking .dots span { animation: none; }
   }
@@ -644,6 +739,7 @@
   <h1>Your Journal</h1>
   <div class="header-right">
     <button id="mood-toggle" class="icon-btn" title="Mood over time" aria-label="Show mood chart">&#9711;</button>
+    <button id="font-toggle" class="icon-btn" title="Font settings" aria-label="Font settings">Aa</button>
     <button id="theme-toggle" class="icon-btn" title="Toggle dark mode" aria-label="Toggle dark mode">&#9789;</button>
     <span class="status" id="status"></span>
   </div>
@@ -690,6 +786,47 @@
     </div>
     <div class="entry-modal-body" id="mood-modal-body">
       <div class="entry-modal-loading">Loading mood data…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Font settings: two independent pickers (the journal's answers vs.
+     your original entries in the "View entry" carousel), each remembered
+     via localStorage the same way Max Recall and dark mode are. A live
+     preview of each updates immediately so you can see a change before
+     closing the modal. -->
+<div id="font-modal-overlay" class="entry-modal-overlay" hidden>
+  <div class="entry-modal" role="dialog" aria-modal="true" aria-label="Font settings">
+    <div class="entry-modal-header">
+      <span class="entry-modal-date">Font settings</span>
+      <button class="entry-modal-close" id="font-modal-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="entry-modal-body">
+      <div class="font-setting-row">
+        <div class="font-setting-label">
+          <span class="font-setting-title">The journal's answers</span>
+          <span class="font-setting-sub">How responses to your questions look</span>
+        </div>
+        <select id="answer-font-select" class="font-select">
+          <option value="handwritten">Cursive handwriting</option>
+          <option value="neat">Print handwriting</option>
+          <option value="plain">Plain text</option>
+        </select>
+      </div>
+      <div class="font-setting-row">
+        <div class="font-setting-label">
+          <span class="font-setting-title">Your original entries</span>
+          <span class="font-setting-sub">How "View entry" text looks</span>
+        </div>
+        <select id="entry-font-select" class="font-select">
+          <option value="handwritten">Cursive handwriting</option>
+          <option value="neat">Print handwriting</option>
+          <option value="plain">Plain text</option>
+        </select>
+      </div>
+      <p class="font-preview-hint">Preview</p>
+      <div class="font-preview-box" id="font-preview-answer" data-font="handwritten">The journal remembers a quiet afternoon in March, walking along the river.</div>
+      <div class="font-preview-box" id="font-preview-entry" data-font="handwritten">Today felt slower than usual. I sat outside for a while and just watched the clouds.</div>
     </div>
   </div>
 </div>
@@ -813,6 +950,7 @@ function addRow(role, html, meta) {
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
+  if (role === 'journal') bubble.setAttribute('data-font', answerFont);
   splitIntoAnswerLines(bubble, html);
   row.appendChild(bubble);
 
@@ -1024,6 +1162,7 @@ async function renderCarouselEntry() {
   // Entries with no photo still render fully -- just as a text-only card.
   const textEl = document.createElement('div');
   textEl.className = 'carousel-text';
+  textEl.setAttribute('data-font', entryFont);
   textEl.textContent = data.text;
   carouselBody.appendChild(textEl);
 }
@@ -1211,6 +1350,95 @@ function renderMoodChart(data) {
     '<span>Brighter months <span style="color:var(--sage-deep)">&#9679;</span></span>' +
     '</div></div>';
 }
+
+// --- Font settings ---
+// Two independent choices -- one for the journal's answers, one for your
+// original entries in the carousel -- each remembered separately via
+// localStorage, same pattern as maxRecallOn above. Applying a font means
+// setting data-font on every relevant element; the actual family/size/
+// weight per value lives in CSS ([data-font="..."] rules) so this stays
+// a one-line attribute swap instead of juggling style properties here.
+const FONT_VALUES = ['handwritten', 'neat', 'plain'];
+let answerFont = 'handwritten';
+let entryFont = 'handwritten';
+try {
+  const savedAnswerFont = localStorage.getItem('answerFont');
+  if (FONT_VALUES.includes(savedAnswerFont)) answerFont = savedAnswerFont;
+  const savedEntryFont = localStorage.getItem('entryFont');
+  if (FONT_VALUES.includes(savedEntryFont)) entryFont = savedEntryFont;
+} catch (e) {
+  // localStorage unavailable -- just use the defaults above.
+}
+
+const fontToggle = document.getElementById('font-toggle');
+const fontModalOverlay = document.getElementById('font-modal-overlay');
+const fontModalClose = document.getElementById('font-modal-close');
+const answerFontSelect = document.getElementById('answer-font-select');
+const entryFontSelect = document.getElementById('entry-font-select');
+const fontPreviewAnswer = document.getElementById('font-preview-answer');
+const fontPreviewEntry = document.getElementById('font-preview-entry');
+
+function applyAnswerFont(shouldPersist) {
+  // Re-tag every already-rendered journal bubble, not just future ones --
+  // otherwise switching fonts mid-conversation would only affect new
+  // messages and leave earlier ones looking inconsistent.
+  document.querySelectorAll('.row.journal .bubble').forEach((b) => {
+    b.setAttribute('data-font', answerFont);
+  });
+  fontPreviewAnswer.setAttribute('data-font', answerFont);
+  if (shouldPersist) {
+    try {
+      localStorage.setItem('answerFont', answerFont);
+    } catch (e) {
+      // Ignore -- the choice still applies for the rest of this page session.
+    }
+  }
+}
+
+function applyEntryFont(shouldPersist) {
+  fontPreviewEntry.setAttribute('data-font', entryFont);
+  // If the carousel happens to be open right now, re-render so the change
+  // is visible immediately instead of only on the next entry you open.
+  if (!carouselOverlay.hidden && carouselEntries.length) renderCarouselEntry();
+  if (shouldPersist) {
+    try {
+      localStorage.setItem('entryFont', entryFont);
+    } catch (e) {
+      // Ignore -- the choice still applies for the rest of this page session.
+    }
+  }
+}
+
+answerFontSelect.value = answerFont;
+entryFontSelect.value = entryFont;
+applyAnswerFont(false);
+applyEntryFont(false);
+
+answerFontSelect.addEventListener('change', () => {
+  answerFont = answerFontSelect.value;
+  applyAnswerFont(true);
+});
+
+entryFontSelect.addEventListener('change', () => {
+  entryFont = entryFontSelect.value;
+  applyEntryFont(true);
+});
+
+fontToggle.addEventListener('click', () => {
+  fontModalOverlay.hidden = false;
+});
+
+fontModalClose.addEventListener('click', () => {
+  fontModalOverlay.hidden = true;
+});
+
+fontModalOverlay.addEventListener('click', (e) => {
+  if (e.target === fontModalOverlay) fontModalOverlay.hidden = true;
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !fontModalOverlay.hidden) fontModalOverlay.hidden = true;
+});
 </script>
 
 </body>

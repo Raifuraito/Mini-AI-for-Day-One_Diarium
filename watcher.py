@@ -73,15 +73,40 @@ while True:
             cwd=PROJECT_DIR
         )
 
-    # --- Periodically check for new/changed journal exports ---
-    # ingest.py (run with no path argument) scans EXPORT_WATCH_DIR itself
-    # and cheaply skips any file whose mtime hasn't changed since last run,
-    # so it's safe -- and much simpler than duplicating that change-detection
-    # here -- to just call it on a timer. Exporting from Day One into that
-    # folder is now the only manual step; this picks it up within a minute.
+    # --- Pull new exports from the sync folder into local storage ---
+    # If a cloud-sync drop zone is configured (JOURNAL_SYNC_DIR), any
+    # .json or .zip files found there are copied into EXPORT_WATCH_DIR
+    # (the local storage folder) and then deleted from the sync folder.
+    # This keeps cloud storage clean -- exports are just a channel, not
+    # a permanent home. The copy-then-delete order guarantees the file
+    # is safely in local storage before the sync copy is removed.
     seconds_since_ingest_check += CHROME_CHECK_SECONDS
     if seconds_since_ingest_check >= INGEST_CHECK_SECONDS:
         seconds_since_ingest_check = 0
+
+        # Lazy import so config.py's .env loading picks up any wizard changes
+        import importlib, config as _cfg
+        importlib.reload(_cfg)
+
+        sync_dir = getattr(_cfg, "SYNC_WATCH_DIR", "") or ""
+        export_dir = _cfg.EXPORT_WATCH_DIR
+
+        if sync_dir and os.path.isdir(sync_dir):
+            os.makedirs(export_dir, exist_ok=True)
+            import shutil, glob as _glob
+            for pattern in ("*.json", "*.zip"):
+                for src_file in _glob.glob(os.path.join(sync_dir, pattern)):
+                    dest = os.path.join(export_dir, os.path.basename(src_file))
+                    try:
+                        shutil.copy2(src_file, dest)
+                        os.remove(src_file)
+                        print(f"  Synced: {os.path.basename(src_file)} -> exports/")
+                    except Exception as ex:
+                        print(f"  Sync error for {os.path.basename(src_file)}: {ex}")
+
+        # --- Run ingest on the local storage folder ---
+        # ingest.py scans EXPORT_WATCH_DIR and cheaply skips any file
+        # whose mtime hasn't changed since last run.
         subprocess.run([PYTHON_EXE, "ingest.py"], cwd=PROJECT_DIR)
 
     time.sleep(CHROME_CHECK_SECONDS)

@@ -28,8 +28,15 @@ def _load_dotenv(path=".env"):
 _load_dotenv()
 
 # --- Paths ---
-# Folder where your journal exports land (synced folder for Diarium,
-# or manual export drop folder for Day One).
+# Cloud-synced drop zone: exports land here from your phone. The watcher
+# copies them into EXPORT_WATCH_DIR and deletes the originals, so they
+# don't stay on your cloud storage permanently. Empty string means no
+# sync folder configured (manual-only workflow).
+SYNC_WATCH_DIR = os.environ.get("JOURNAL_SYNC_DIR", "")
+
+# Local storage folder where journal exports are kept permanently.
+# The watcher copies files here from SYNC_WATCH_DIR (if set), and
+# ingest.py reads from here.
 EXPORT_WATCH_DIR = os.environ.get("JOURNAL_EXPORT_DIR", "./exports")
 
 # Where the vector DB lives (local, persistent, free).
@@ -44,11 +51,23 @@ PROCESSED_LOG = os.environ.get("JOURNAL_PROCESSED_LOG", "./processed_entries.jso
 # for) every time you run it again.
 TAG_BACKFILL_LOG = os.environ.get("JOURNAL_TAG_LOG", "./tag_backfill_log.json")
 
-# --- Anthropic API ---
-# Set this in your environment (or via setup_wizard.py); never hardcode a
-# key in this file.
+# --- AI provider ---
+# Which AI service to use. Set via setup_wizard.py or .env.
+AI_PROVIDER = os.environ.get("AI_PROVIDER", "anthropic")
+
+# API keys -- only the one matching AI_PROVIDER needs to be set.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-CLAUDE_MODEL = "claude-sonnet-4-6"  # good balance of cost/quality for Q&A
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+
+# Model to use for Q&A -- read from .env, with sensible defaults per provider.
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-haiku-4-5")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-small-latest")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1")
 
 # --- Embeddings ---
 # Chroma's default local embedding function runs free, on-device (no API cost).
@@ -137,9 +156,15 @@ ENABLE_TAGGING = os.environ.get("ENABLE_TAGGING", "false").strip().lower() == "t
 
 # Model used for tag extraction. Defaults to the same model as everything
 # else; point this at a cheaper/faster one if you want to cut cost.
-TAG_EXTRACTION_MODEL = "claude-haiku-4-5"  # Haiku instead of Sonnet -- tagging just
-# extracts short people/places/theme lists, doesn't need Sonnet's quality, and
-# Haiku is roughly 1/3 the price. Q&A itself (CLAUDE_MODEL, above) stays on Sonnet.
+# Tagging always uses the cheapest model for the active provider.
+_TAG_MODELS = {
+    "anthropic": "claude-haiku-4-5",
+    "openai": "gpt-4o-mini",
+    "google": "gemini-2.0-flash",
+    "mistral": "mistral-small-latest",
+    "ollama": OLLAMA_MODEL,  # Ollama has no tier distinction
+}
+TAG_EXTRACTION_MODEL = _TAG_MODELS.get(AI_PROVIDER, "claude-haiku-4-5")
 
 # How many entries to send to Claude per tagging call during ingest.
 # Batched rather than one call per entry -- with 1000+ entries, one call

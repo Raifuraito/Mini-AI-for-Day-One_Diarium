@@ -30,6 +30,7 @@ from datetime import datetime
 import chromadb
 
 import config
+import llm
 
 # --- Sentiment scoring (keyword-ratio based, no external library) ---
 # Deliberately simple: counts word-boundary matches against two fixed
@@ -473,24 +474,18 @@ def chunk_text(text, size=None, overlap=None):
     return chunks
 
 
-_tagging_client = None
-
-
 def get_tagging_client():
     """
-    Lazily-created Anthropic client used only for tag extraction. Separate
-    from any client server.py/ask.py create -- this module can be imported
-    (e.g. by server.py, for PHOTOS_DIR) without requiring an API key unless
-    tagging actually runs.
+    Kept for backwards compatibility. Tag extraction now goes through the
+    provider-agnostic llm module (see extract_tags_batch), so there is no
+    separate client object to create -- this returns None and the `client`
+    argument to extract_tags_batch is ignored. Left in place so any caller
+    that still calls it (and passes the result along) keeps working.
     """
-    global _tagging_client
-    if _tagging_client is None:
-        from anthropic import Anthropic
-        _tagging_client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    return _tagging_client
+    return None
 
 
-def extract_tags_batch(entries, client):
+def extract_tags_batch(entries, client=None):
     """
     Extracts tags (people/places/organizations/themes) for a batch of
     entries in ONE Claude call instead of one call per entry -- with
@@ -523,12 +518,8 @@ def extract_tags_batch(entries, client):
         f"\n\n{numbered}"
     )
     try:
-        response = client.messages.create(
-            model=config.TAG_EXTRACTION_MODEL,
-            max_tokens=1500,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = "".join(b.text for b in response.content if hasattr(b, "text")).strip()
+        raw, _usage = llm.chat(prompt, model=llm.get_tag_model(), max_tokens=1500)
+        raw = (raw or "").strip()
         # Claude sometimes wraps JSON in a code fence despite instructions
         # not to -- strip that off rather than failing the whole batch.
         if raw.startswith("```"):

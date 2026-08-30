@@ -15,7 +15,7 @@ import difflib
 from datetime import datetime
 
 import chromadb
-from anthropic import Anthropic
+import llm
 
 import config
 
@@ -802,8 +802,9 @@ def main():
 
     question = sys.argv[1]
 
-    if not config.ANTHROPIC_API_KEY:
-        print("Set the ANTHROPIC_API_KEY environment variable first.")
+    if not llm.is_configured():
+        print(f"No API key configured for {llm.provider_name()}. "
+              f"Run setup_wizard.py first.")
         return
 
     client = chromadb.PersistentClient(path=config.VECTOR_DB_DIR)
@@ -813,19 +814,10 @@ def main():
         print("Your journal DB is empty -- run ingest.py first.")
         return
 
-    anthropic_client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
-
     # Statement detection -- respond warmly instead of doing a confused search
     if is_statement(question):
         prompt = build_statement_prompt(question)
-        response = anthropic_client.messages.create(
-            model=config.CLAUDE_MODEL,
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        answer = "".join(
-            block.text for block in response.content if hasattr(block, "text")
-        )
+        answer, _usage = llm.chat(prompt, max_tokens=200)
         print(answer)
         return
 
@@ -834,21 +826,13 @@ def main():
         visual_matches = retrieve_visual_context(question, collection)
         if visual_matches:
             prompt = build_visual_prompt(question, visual_matches)
-            response = anthropic_client.messages.create(
-                model=config.CLAUDE_MODEL,
-                max_tokens=1000,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            answer = "".join(
-                block.text for block in response.content if hasattr(block, "text")
-            )
+            answer, usage = llm.chat(prompt, max_tokens=1000)
             print(answer)
             print("\n📸 Matched photo(s):")
             for photo_id, date, _, *__ in visual_matches:
                 print(f"  [{date or 'unknown date'}] {photo_id}")
-            usage = getattr(response, "usage", None)
             if usage:
-                print(f"\n(~{usage.input_tokens} input / {usage.output_tokens} output tokens)")
+                print(f"\n(~{usage['input_tokens']} input / {usage['output_tokens']} output tokens)")
             return
 
     # Phase 5: combined text + visual search for all other questions
@@ -860,15 +844,7 @@ def main():
         print(f"⚠️  Large query (~{est_tokens} tokens). Consider lowering "
               f"MAX_CONTEXT_CHUNKS in config.py if this becomes frequent.\n")
 
-    response = anthropic_client.messages.create(
-        model=config.CLAUDE_MODEL,
-        max_tokens=1000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    answer = "".join(
-        block.text for block in response.content if hasattr(block, "text")
-    )
+    answer, usage = llm.chat(prompt, max_tokens=1000)
     print(answer)
 
     if combined["photos"]:
@@ -876,9 +852,8 @@ def main():
         for photo_id, date, _, score, *__ in combined["photos"]:
             print(f"  [{date or 'unknown date'}] {photo_id} ({score:.0%} match)")
 
-    usage = getattr(response, "usage", None)
     if usage:
-        print(f"\n(~{usage.input_tokens} input / {usage.output_tokens} output tokens)")
+        print(f"\n(~{usage['input_tokens']} input / {usage['output_tokens']} output tokens)")
 
 
 if __name__ == "__main__":
