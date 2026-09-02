@@ -42,6 +42,46 @@ def get_tag_model():
     return config.TAG_EXTRACTION_MODEL
 
 
+_PROVIDER_LABELS = {
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+    "google": "Google",
+    "mistral": "Mistral",
+    "ollama": "Ollama",
+}
+
+
+def provider_name():
+    """Human-friendly name for the active provider, used in error messages
+    (e.g. "No API key configured for Anthropic.") instead of the raw
+    lowercase config value."""
+    return _PROVIDER_LABELS.get(config.AI_PROVIDER, config.AI_PROVIDER)
+
+
+def is_configured():
+    """
+    True if the active provider (config.AI_PROVIDER) has what it needs to
+    actually make a call -- an API key for the four hosted providers, or
+    just a reachable base URL for Ollama (which needs no key since it runs
+    locally, and OLLAMA_BASE_URL always has a default). Checked before
+    every question so a missing key surfaces as one clear line ("Run
+    setup_wizard.py first") instead of a raw traceback from deep inside
+    whichever provider's SDK.
+    """
+    p = config.AI_PROVIDER
+    if p == "anthropic":
+        return bool(config.ANTHROPIC_API_KEY)
+    elif p == "openai":
+        return bool(config.OPENAI_API_KEY)
+    elif p == "google":
+        return bool(config.GOOGLE_API_KEY)
+    elif p == "mistral":
+        return bool(config.MISTRAL_API_KEY)
+    elif p == "ollama":
+        return bool(config.OLLAMA_BASE_URL)
+    return False
+
+
 def _ensure_messages(prompt_or_messages):
     """Normalize input to a list of message dicts."""
     if isinstance(prompt_or_messages, str):
