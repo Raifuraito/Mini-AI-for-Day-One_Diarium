@@ -420,6 +420,8 @@ crontab -e
 
 **Windows (Task Scheduler), auto-starting `watcher.py` itself:** this is a *different* recipe from the one above -- that one schedules `ingest.py` alone, on a daily timer. `watcher.py` needs to start once and then keep running continuously, so it needs an **At log on** trigger, not Daily -- a Daily trigger will only ever fire once at a fixed clock time, which looks like "it just doesn't start" if you're not at your computer then.
 
+> If the setup wizard's own attempt to register this failed with something like `ERROR: Access is denied`, that almost always means it wasn't run with administrator rights. Close the wizard, right-click PowerShell or Command Prompt and choose **Run as administrator**, then re-run `python setup_wizard.py` and click **Register now** again -- that alone fixes it most of the time, before you need any of the manual steps below.
+
 1. Open Task Scheduler → Action → Create Task... (not "Create Basic Task" this time -- the basic wizard doesn't expose the trigger type this needs).
 2. **General tab:** name it (e.g. "MiniAI for DayOne & Diarium Watcher"). Under "Security options," select "Run whether user is logged on or not" only if you want it fully invisible; "Run only when user is logged on" is simpler and fine for personal use.
 3. **Triggers tab** → New... → "Begin the task" dropdown → **At log on** → OK.

@@ -311,14 +311,22 @@ def _register_autostart():
             return False, (
                 "Windows: couldn't register the auto-start task automatically "
                 f"(schtasks said: {_html.escape(result.stderr.strip() or result.stdout.strip())}). "
-                "The app still works, just needs `python watcher.py` run manually, "
-                "or see the README for the manual Task Scheduler steps."
+                "This is almost always a permissions issue -- close this wizard, "
+                "right-click PowerShell or Command Prompt and choose &lsquo;Run as "
+                "administrator,&rsquo; then re-run `python setup_wizard.py` from here "
+                "and click Register now again. The app still works in the meantime, "
+                "just needs `python watcher.py` run manually, or see the README for "
+                "the manual Task Scheduler steps."
             )
         except Exception as e:
             return False, (
                 f"Windows: couldn't register the auto-start task automatically ({e}). "
-                "The app still works, just needs `python watcher.py` run manually, "
-                "or see the README for the manual Task Scheduler steps."
+                "This is almost always a permissions issue -- close this wizard, "
+                "right-click PowerShell or Command Prompt and choose &lsquo;Run as "
+                "administrator,&rsquo; then re-run `python setup_wizard.py` from here "
+                "and click Register now again. The app still works in the meantime, "
+                "just needs `python watcher.py` run manually, or see the README for "
+                "the manual Task Scheduler steps."
             )
 
     if sys.platform == "darwin":
@@ -1413,7 +1421,7 @@ def save():
     else:
         banner = (
             '<div class="banner success">Saved! ' + tagging_note
-            + ' Use Step 6 below to set up auto-start if you haven\'t already.</div>'
+            + ' Use Step 5 below to set up auto-start if you haven\'t already.</div>'
         )
     return render_page(banner, values, path_values, tagging_enabled=tagging_enabled)
 
