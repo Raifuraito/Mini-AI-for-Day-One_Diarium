@@ -306,7 +306,11 @@ def _register_autostart():
             if result.returncode == 0:
                 return True, (
                     f'Windows: registered "{task_name}" in Task Scheduler, set to start at '
-                    "login. You can see it under Task Scheduler Library if you want to check."
+                    "login. It won't fire until your *next* actual log on or restart -- "
+                    "checking Task Scheduler right now will correctly show it's never run "
+                    "yet, and that's expected, not a failure. If you want to confirm it "
+                    "works without waiting, find it in Task Scheduler Library, right-click "
+                    "it, and choose Run."
                 )
             return False, (
                 "Windows: couldn't register the auto-start task automatically "
