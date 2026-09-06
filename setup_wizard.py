@@ -281,6 +281,29 @@ import json as _json
 import html as _html
 
 
+def _windows_windowless_python(python_exe):
+    """
+    On Windows, python.exe always spawns a console window; pythonw.exe is
+    the exact same interpreter that runs headless (no console, no visible
+    terminal, no taskbar entry). It ships alongside python.exe in every
+    standard CPython install, so this is really just a filename swap.
+
+    Used only for the auto-start Task Scheduler registration -- the watcher
+    is meant to sit invisibly in the background, and a console window
+    popping up at every login is exactly the friction this whole auto-start
+    step exists to remove. If pythonw.exe isn't next to python.exe for
+    whatever reason (an unusual embedded install, a distribution that omits
+    it), we fall back to python.exe so at least the task still registers,
+    with a visible console -- broken visibility beats a broken watcher.
+
+    Returns the pythonw.exe path if available, else the original python_exe.
+    """
+    if sys.platform != "win32":
+        return python_exe
+    pythonw = os.path.join(os.path.dirname(python_exe), "pythonw.exe")
+    return pythonw if os.path.exists(pythonw) else python_exe
+
+
 def _register_autostart():
     """
     Registers watcher.py to start automatically at login, so nothing needs
@@ -296,7 +319,9 @@ def _register_autostart():
 
     if sys.platform == "win32":
         task_name = "MiniAI for DayOne & Diarium Watcher"
-        tr_value = f'"{python_exe}" "{watcher_path}"'
+        # pythonw.exe instead of python.exe -- silent, no console window at login.
+        launch_exe = _windows_windowless_python(python_exe)
+        tr_value = f'"{launch_exe}" "{watcher_path}"'
         try:
             result = subprocess.run(
                 ["schtasks", "/Create", "/TN", task_name, "/TR", tr_value,
@@ -393,13 +418,14 @@ def _autostart_preview():
     watcher_path = os.path.join(_PROJECT_ROOT, "watcher.py")
 
     if sys.platform == "win32":
+        launch_exe = _windows_windowless_python(python_exe)
         return {
             "platform": "Windows",
             "method": "Task Scheduler",
             "task_name": "MiniAI for DayOne & Diarium Watcher",
             "trigger": "At log on (runs every time you sign into Windows)",
-            "command": f'"{python_exe}" "{watcher_path}"',
-            "note": "This creates a scheduled task that starts the watcher automatically whenever you log in. It replaces any existing task with the same name.",
+            "command": f'"{launch_exe}" "{watcher_path}"',
+            "note": "This creates a scheduled task that starts the watcher automatically at login, using pythonw.exe so it runs silently in the background with no console window. It replaces any existing task with the same name.",
         }
     elif sys.platform == "darwin":
         return {

@@ -78,14 +78,14 @@ USE_HOSTED_EMBEDDINGS = False
 # --- Cost guardrails ---
 # Caps how many journal chunks get stuffed into context per question.
 # More chunks = better recall but more tokens = more cost.
-MAX_CONTEXT_CHUNKS = 8
+MAX_CONTEXT_CHUNKS = 12
 
 # Higher cap used only for questions that clearly ask about a trend,
 # pattern, week, or month ("how have I been feeling lately", "any
 # patterns in my week") -- these genuinely need more spread-out context
 # to answer well. Single-fact questions keep the cheaper MAX_CONTEXT_CHUNKS
 # limit above; only detected trend/range questions use this higher one.
-TREND_MAX_CONTEXT_CHUNKS = 25
+TREND_MAX_CONTEXT_CHUNKS = 32
 
 # Widest cap, used only for genuine synthesis/organizing questions --
 # "summarize my meeting notes and give me action items", "what should I
@@ -94,13 +94,13 @@ TREND_MAX_CONTEXT_CHUNKS = 25
 # Costs more per question (roughly 2-4 cents at this size) but only fires
 # for questions that actually ask to combine/organize/synthesize -- see
 # SYNTHESIS_KEYWORDS in ask.py.
-SYNTHESIS_MAX_CONTEXT_CHUNKS = 50
+SYNTHESIS_MAX_CONTEXT_CHUNKS = 60
 
 # Rough token budget per query (context + question + answer). This is a
 # soft safety check, not a hard API-enforced limit -- it just warns you
 # before sending an unusually large request. Raised to accommodate the
 # synthesis tier without warning on every single synthesis question.
-MAX_TOKENS_PER_QUERY_WARNING = 12000
+MAX_TOKENS_PER_QUERY_WARNING = 16000
 
 # Chunking: split entries longer than this into multiple pieces so
 # embeddings stay focused and retrieval is more precise.
@@ -112,13 +112,13 @@ CHUNK_OVERLAP_CHARS = 200
 # question, before their entries get sent to Claude for a written
 # description. Kept separate from MAX_CONTEXT_CHUNKS since it caps photos,
 # not text chunks.
-MAX_VISUAL_RESULTS = 5
+MAX_VISUAL_RESULTS = 8
 
 # --- Phase 5: ambient visual search ---
 # How many entries with photos to show on every non-photo-specific question.
 # Photos follow entries, so this controls entry count, not photo count.
 # Examples: 3 = show up to 3 entries with photos, 5 = up to 5, 10 = up to 10, etc.
-PHASE5_MAX_ENTRY_RESULTS = 3
+PHASE5_MAX_ENTRY_RESULTS = 4
 
 # Minimum CLIP similarity score (0-1) for a photo to be included in a
 # normal (non-photo-specific) answer. Raised to 0.30 to cut false

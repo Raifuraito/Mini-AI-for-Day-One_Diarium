@@ -32,7 +32,7 @@ from ask import (
     is_statement, build_statement_prompt,
     is_synthesis_question, is_trend_question,
 )
-from ingest import PHOTOS_DIR
+from ingest import PHOTOS_DIR, strip_photo_tokens
 
 app = Flask(__name__)
 # Auto-reload templates from disk on every request instead of caching the
@@ -59,10 +59,18 @@ HISTORY_LOG = os.path.join(
 
 
 # Month name -> number map for matching human-readable dates in answers
-_MONTH_MAP = {
-    "jan": "01", "feb": "02", "mar": "03", "apr": "04",
-    "may": "05", "jun": "06", "jul": "07", "aug": "08",
-    "sep": "09", "oct": "10", "nov": "11", "dec": "12",
+# Month number -> every spelling Claude might use when it writes a date in
+# prose, so date-matching works whether the model wrote "Apr 28", "April
+# 28", or "Sept 28". Having ONLY the 3-letter abbreviations here was a real
+# bug: when Claude wrote the full name ("April 28, 2026") every source got
+# filtered out and the answer showed no "View entry" buttons at all.
+_MONTH_NAMES = {
+    "01": ("jan", "january"), "02": ("feb", "february"),
+    "03": ("mar", "march"),   "04": ("apr", "april"),
+    "05": ("may",),           "06": ("jun", "june"),
+    "07": ("jul", "july"),    "08": ("aug", "august"),
+    "09": ("sep", "sept", "september"), "10": ("oct", "october"),
+    "11": ("nov", "november"), "12": ("dec", "december"),
 }
 
 def _answer_mentions_date(answer_lower, iso_date):
@@ -87,15 +95,13 @@ def _answer_mentions_date(answer_lower, iso_date):
 
     day_int = int(day)
 
-    # Check every month-name variant
-    for abbr, num in _MONTH_MAP.items():
-        if num != month:
-            continue
-        # "jan 19, 2026" / "jan 19 2026" / "jan 19"
+    # Check every spelling for this month -- abbreviated and full.
+    for name in _MONTH_NAMES.get(month, ()):
+        # "apr 28, 2026" / "april 28, 2026" / "apr 28 2026" / "apr. 28"
         patterns = [
-            f"{abbr} {day_int},",
-            f"{abbr} {day_int} {year}",
-            f"{abbr}. {day_int}",
+            f"{name} {day_int},",
+            f"{name} {day_int} {year}",
+            f"{name}. {day_int}",
         ]
         for p in patterns:
             if p in answer_lower:
@@ -215,6 +221,85 @@ def open_settings():
 </body></html>"""
 
 
+_FOLLOWUP_CUES = (
+    "show me again", "again", "more", "another", "what about", "how about",
+    "that one", "those", "them", "the same", "keep going", "next", "continue",
+    "as well", "also show", "and the", "what else",
+)
+
+
+def _looks_like_followup(question):
+    """
+    Heuristic for whether a question leans on the previous turn instead of
+    standing on its own. Short questions ("show me again", "the beach?") and
+    ones carrying an explicit follow-up cue qualify. Kept deliberately loose:
+    a false positive only costs one cheap Haiku rewrite that returns the
+    query roughly unchanged, whereas a false negative means a follow-up
+    silently retrieves on meaningless words -- so we bias toward catching them.
+    """
+    q = question.strip().lower()
+    if len(q.split()) <= 4:
+        return True
+    return any(cue in q for cue in _FOLLOWUP_CUES)
+
+
+def _reformulate_for_retrieval(question, history):
+    """
+    Turn a follow-up ("show me again", "what about the beach") into a
+    standalone search query using recent conversation, so the RETRIEVAL step
+    has real topic words to match. Without this, a short follow-up searches
+    on its own literal words -- which carry no topic -- and comes back empty
+    even when the previous turn made the intent obvious.
+
+    Only fires on questions that actually look like follow-ups, so ordinary
+    standalone questions incur no extra model call. The result is used for
+    retrieval ONLY -- the user's original words are still what gets stored,
+    displayed, and shown to Claude when composing the answer.
+
+    "Both" strategy, chosen for robustness at minimal cost:
+      1. Always blend in the previous user question's text -- a zero-cost
+         safety net guaranteeing the prior topic's words reach the search.
+      2. Additionally ask the cheap tag model (Haiku) to rewrite the message
+         into a clean standalone query, which resolves pronouns and implicit
+         references the raw blend can't. If it's unavailable or errors, the
+         blend alone still helps.
+    """
+    if not history or not _looks_like_followup(question):
+        return question
+
+    prev_user = ""
+    for turn in reversed(history):
+        if turn.get("role") == "user":
+            prev_user = turn.get("content", "") or ""
+            break
+    blended = (prev_user + " " + question).strip() if prev_user else question
+
+    try:
+        if llm.is_configured():
+            recent = history[-4:]
+            convo = "\n".join(f"{t.get('role')}: {t.get('content')}" for t in recent)
+            rewrite_prompt = (
+                "Rewrite the user's latest message into a single standalone "
+                "search query for looking up their own journal entries, using "
+                "the conversation for context. Resolve references like 'again', "
+                "'more', 'that', 'those', 'them'. Reply with ONLY the query "
+                "text -- no quotes, no explanation.\n\n"
+                f"Conversation:\n{convo}\n\nLatest message: {question}\n\n"
+                "Standalone query:"
+            )
+            rewritten, _ = llm.chat(
+                rewrite_prompt, model=llm.get_tag_model(), max_tokens=60
+            )
+            rewritten = (rewritten or "").strip().strip('"').strip()
+            if rewritten:
+                # Keep both the model's cleaned query and the raw blended
+                # words -- belt and suspenders for retrieval recall.
+                return (rewritten + " " + blended).strip()
+    except Exception:
+        pass
+    return blended
+
+
 @app.route("/api/ask", methods=["POST"])
 def ask():
     data = request.get_json(force=True)
@@ -235,6 +320,11 @@ def ask():
         return jsonify({
             "error": "Your journal hasn't been ingested yet. Run ingest.py first."
         }), 400
+
+    # Resolve follow-ups ("show me again", "what about the beach") into a
+    # standalone query for RETRIEVAL only -- the original `question` is still
+    # what's stored, displayed, and handed to Claude for the actual answer.
+    retrieval_question = _reformulate_for_retrieval(question, history)
 
     # Statement detection -- respond warmly instead of searching
     if is_statement(question):
@@ -263,8 +353,8 @@ def ask():
 
     # Phase 4: explicit photo search questions route to visual-only
     visual_matches = None
-    if is_visual_search_question(question):
-        visual_matches = retrieve_visual_context(question, collection)
+    if is_visual_search_question(retrieval_question):
+        visual_matches = retrieve_visual_context(retrieval_question, collection)
 
     if visual_matches:
         visual_prompt = build_visual_prompt(question, visual_matches)
@@ -275,14 +365,23 @@ def ask():
             answer, usage_info = llm.chat(messages, max_tokens=1000)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-        sources = [
+        candidate_sources = [
             {"date": date or "unknown", "photo": photo_id, "is_visual": True,
              "entry_id": entry_id or None}
             for photo_id, date, text, score, entry_id in visual_matches
         ]
-        # Photo search always gets the strict filter -- if Claude didn't
-        # end up mentioning a matched photo's date at all, don't show it.
-        sources = _filter_sources_to_answer(sources, answer)
+        # Normally, strict-filter down to only the photos whose date Claude
+        # actually cited -- that keeps confident answers tight and avoids
+        # showing a matched photo Claude decided wasn't relevant. But when
+        # Claude is UNSURE (e.g. "I don't see a sea lion in these"), it cites
+        # no dates at all, so the strict filter would drop every candidate
+        # and leave nothing to look at. In that specific case, fall back to
+        # the closest visual matches unfiltered, so the user can flip through
+        # them in the View-entry carousel and judge for themselves -- the
+        # "idk what you mean, but here are the closest guesses" behavior.
+        sources = _filter_sources_to_answer(candidate_sources, answer)
+        if not sources:
+            sources = candidate_sources
         timestamp = datetime.now().strftime("%b %d, %Y")
         append_history(question, answer, sources, timestamp)
         # Store original question in history, not the prompt with embedded context
@@ -301,7 +400,7 @@ def ask():
         })
 
     # Phase 5: combined text + visual for all other questions
-    combined = retrieve_combined_context(question, collection, force_max=max_recall)
+    combined = retrieve_combined_context(retrieval_question, collection, force_max=max_recall)
     combined_prompt = build_combined_prompt(question, combined)
     est_tokens = rough_token_estimate(combined_prompt)
 
@@ -397,7 +496,10 @@ def get_entry(entry_id):
         return int(tail) if tail.isdigit() else 0
 
     order = sorted(range(len(ids)), key=lambda i: chunk_index(ids[i]))
-    full_text = "".join(docs[i] for i in order)
+    # strip_photo_tokens here (not just at ingest) so entries embedded
+    # BEFORE this fix also display cleanly -- no costly --force re-ingest
+    # needed just to hide the raw ![](dayone-moment://...) tokens.
+    full_text = strip_photo_tokens("".join(docs[i] for i in order))
 
     date = metas[0].get("date", "") if metas else ""
     photo = next((m.get("photo") for m in metas if m.get("photo")), None)

@@ -337,6 +337,34 @@ def _first_present(d, keys, default=""):
     return default
 
 
+_PHOTO_TOKEN_RE = re.compile(r'!\[[^\]]*\]\([^)]*(?:dayone|moment://)[^)]*\)')
+
+
+def strip_photo_tokens(text):
+    """
+    Remove Day One's inline photo-reference tokens from entry text.
+
+    Day One exports embed each attached photo in the entry body as a
+    markdown image whose URL is an internal "moment" identifier, e.g.
+        ![](dayone-moment://A0016F76AEC64A2DB59284C4080DED01)
+    That identifier points at a photo inside the export, not at anything
+    reachable here -- this app extracts and displays photos separately (see
+    extract_photo_filename and the photos/ folder). Left in the text, the
+    token renders as literal broken-image junk at the bottom of the "View
+    entry" popup, and adds meaningless characters to what gets embedded and
+    sent to the model. This strips those tokens out and tidies up the blank
+    lines they leave behind. Safe on non-Day-One text: it only matches
+    markdown images whose URL contains "dayone" or "moment://", so ordinary
+    entry prose is never touched.
+    """
+    if not text:
+        return text
+    cleaned = _PHOTO_TOKEN_RE.sub("", text)
+    # Collapse the runs of blank lines a removed token can leave behind.
+    cleaned = re.sub(r'\n[ \t]*\n[ \t]*\n+', '\n\n', cleaned)
+    return cleaned.strip()
+
+
 def normalize_entries(raw_data):
     """
     Best-effort normalization across export formats.
@@ -376,7 +404,7 @@ def normalize_entries(raw_data):
             entries.append({
                 "id": e.get("uuid") or e.get("id"),
                 "date": entry_date,
-                "text": e.get("text", "").strip(),
+                "text": strip_photo_tokens(e.get("text", "")),
                 "photo": extract_photo_filename(e),
             })
         return entries

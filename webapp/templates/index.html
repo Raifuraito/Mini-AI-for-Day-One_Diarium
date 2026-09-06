@@ -91,6 +91,9 @@
     justify-content: center;
     padding: 0;
     transition: background 0.15s;
+    /* the settings gear is an <a>, which would otherwise get the default
+       link underline -- kill it so the icon buttons look uniform. */
+    text-decoration: none;
   }
 
   .icon-btn:hover {
@@ -393,6 +396,10 @@
     font-family: 'Inter', sans-serif;
   }
   .expand-entry-btn:hover { opacity: 1; }
+
+  /* Standalone "View closest matches" button shown under an uncertain
+     visual-search answer, where no per-line View-entry buttons appear. */
+  .candidate-matches { margin-top: 8px; }
 
   /* Entry carousel -- full-screen viewer for every entry cited in one
      answer. Opened by an "View entry" button under an excerpt line;
@@ -977,6 +984,30 @@ function addRow(role, html, meta) {
   // a known entry_id -- only relevant for journal (not user) rows.
   if (role === 'journal' && sources.length) {
     attachExpandButtons(row, sources);
+    // Fallback for visual searches where Claude was unsure: it cited no
+    // dates, so attachExpandButtons() attached nothing above -- but the
+    // backend still handed us the closest photo matches. Rather than leave
+    // them invisible, drop in one standalone button that opens all of them
+    // in the carousel, so you can eyeball the closest guesses yourself.
+    const hasInlineButtons = row.querySelector('.expand-entry-btn') !== null;
+    const visualCandidates = sources.filter(s => s.is_visual && s.entry_id);
+    if (!hasInlineButtons && visualCandidates.length) {
+      const seen = new Set();
+      const entryList = [];
+      for (const s of visualCandidates) {
+        if (seen.has(s.entry_id)) continue;
+        seen.add(s.entry_id);
+        entryList.push({ entry_id: s.entry_id, date: s.date });
+      }
+      const wrap = document.createElement('div');
+      wrap.className = 'candidate-matches';
+      const btn = document.createElement('button');
+      btn.className = 'expand-entry-btn';
+      btn.textContent = '\u2922 View closest matches (' + entryList.length + ')';
+      btn.addEventListener('click', () => openCarousel(entryList, 0));
+      wrap.appendChild(btn);
+      row.appendChild(wrap);
+    }
   }
 
   return row;

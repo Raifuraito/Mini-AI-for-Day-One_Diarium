@@ -177,6 +177,45 @@ def _chat_ollama(messages, model, max_tokens):
     return text, None
 
 
+def _normalize_usage(usage):
+    """
+    Convert a provider-specific usage object into a plain JSON-serializable
+    dict, or None if there's nothing to report.
+
+    Every SDK returns its own object type for token accounting -- Anthropic
+    returns a `Usage` object, OpenAI a `CompletionUsage`, Mistral its own
+    class, and Ollama/Google return None. The web layer passes this straight
+    to `flask.jsonify()`, which chokes on any of those non-dict types with
+    "Object of type Usage is not JSON serializable." Rather than teach each
+    caller how to handle a different shape per provider, we flatten it here
+    once, at the source, so every caller and every provider surface the same
+    plain dict.
+
+    Tries the modern `.model_dump()` first (Pydantic v2, used by every
+    current major SDK), then a couple of older fallbacks so this keeps
+    working across version pins. If none match, returns None -- an unknown
+    usage shape is not worth crashing an actual answer over.
+    """
+    if usage is None:
+        return None
+    if isinstance(usage, dict):
+        return usage
+    for method in ("model_dump", "to_dict", "dict"):
+        fn = getattr(usage, method, None)
+        if callable(fn):
+            try:
+                return fn()
+            except Exception:
+                continue
+    # Last-ditch: pull the two fields we care about by attribute name.
+    result = {}
+    for attr in ("input_tokens", "output_tokens", "prompt_tokens", "completion_tokens", "total_tokens"):
+        val = getattr(usage, attr, None)
+        if val is not None:
+            result[attr] = val
+    return result or None
+
+
 _BACKENDS = {
     "anthropic": _chat_anthropic,
     "openai": _chat_openai,
@@ -204,4 +243,5 @@ def chat(prompt_or_messages, model=None, max_tokens=1000, provider=None):
             f"Supported: {', '.join(_BACKENDS.keys())}"
         )
 
-    return backend(messages, model, max_tokens)
+    text, usage = backend(messages, model, max_tokens)
+    return text, _normalize_usage(usage)
