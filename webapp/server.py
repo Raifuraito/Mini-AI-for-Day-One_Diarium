@@ -522,7 +522,30 @@ def history():
 @app.route("/api/status")
 def status():
     collection = get_collection()
-    return jsonify({"entry_chunks": collection.count()})
+    stats = {"entry_chunks": collection.count()}
+    # How many journal entries have been ingested (from the ingest log) and when
+    # that last happened -- so the header reflects the real state of your journal,
+    # not just the raw chunk count.
+    try:
+        proc_log = config.PROCESSED_LOG
+        if not os.path.isabs(proc_log):
+            # Resolve relative to the project root, not the current working
+            # directory, so the stats work no matter how the server was started.
+            _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            proc_log = os.path.join(_root, proc_log)
+        if os.path.exists(proc_log):
+            with open(proc_log, "r", encoding="utf-8") as f:
+                stats["entries"] = len(json.load(f))
+            stats["last_updated"] = os.path.getmtime(proc_log)
+    except Exception:
+        pass
+    # How many photos are available locally for visual search.
+    try:
+        if os.path.isdir(PHOTOS_DIR):
+            stats["photos"] = sum(1 for e in os.scandir(PHOTOS_DIR) if e.is_file())
+    except Exception:
+        pass
+    return jsonify(stats)
 
 
 @app.route("/api/mood")
@@ -570,5 +593,11 @@ def clear_session_history():
 
 
 if __name__ == "__main__":
-    # host=0.0.0.0 so it's reachable over Tailscale, not just localhost.
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    # By default the server binds 0.0.0.0 so it's reachable from your phone
+    # over your LAN or Tailscale -- convenient, but it means any device on
+    # your network can reach it. If you only ever use it on THIS computer,
+    # set SERVER_HOST=127.0.0.1 in your .env to lock it to localhost only
+    # (more private/secure). Never expose this port to the public internet.
+    _host = os.environ.get("SERVER_HOST", "0.0.0.0")
+    _port = int(os.environ.get("SERVER_PORT", "5000"))
+    app.run(host=_host, port=_port, debug=False)

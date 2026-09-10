@@ -95,7 +95,14 @@ def _ensure_messages(prompt_or_messages):
 
 def _chat_anthropic(messages, model, max_tokens):
     from anthropic import Anthropic
-    client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    _headers = {}
+    _ws = getattr(config, "ANTHROPIC_WORKSPACE_ID", "")
+    if _ws:
+        # Required when the API key is an org/admin key not scoped to one
+        # workspace; harmless (ignored) with a normal workspace-scoped key.
+        _headers["anthropic-workspace-id"] = _ws
+    client = Anthropic(api_key=config.ANTHROPIC_API_KEY,
+                       default_headers=_headers or None)
     response = client.messages.create(
         model=model,
         max_tokens=max_tokens,

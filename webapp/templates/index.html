@@ -1022,11 +1022,25 @@ function addThinking() {
   return el;
 }
 
+function _timeAgo(epochSeconds) {
+  var s = Math.max(0, Date.now() / 1000 - epochSeconds);
+  if (s < 90) return 'updated just now';
+  var m = Math.round(s / 60);
+  if (m < 60) return 'updated ' + m + 'm ago';
+  var h = Math.round(m / 60);
+  if (h < 48) return 'updated ' + h + 'h ago';
+  return 'updated ' + Math.round(h / 24) + 'd ago';
+}
 async function refreshStatus() {
   try {
     const res = await fetch('/api/status');
     const data = await res.json();
-    statusEl.textContent = data.entry_chunks + ' passages indexed';
+    var parts = [];
+    if (data.entries != null) parts.push(data.entries.toLocaleString() + ' entries');
+    else parts.push(data.entry_chunks + ' passages');
+    if (data.photos != null) parts.push(data.photos.toLocaleString() + ' photos');
+    if (data.last_updated) parts.push(_timeAgo(data.last_updated));
+    statusEl.textContent = parts.join(' · ');
   } catch (e) {
     statusEl.textContent = '';
   }

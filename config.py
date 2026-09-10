@@ -7,10 +7,12 @@ import os
 
 # --- Optional .env file support ---
 # Lets setup_wizard.py (or hand-editing a .env file) configure this app
-# without touching a terminal's environment variables. A real environment
-# variable set via `export`/`setx` always wins over a value from .env, so
-# this never overrides anyone already using that approach -- it only fills
-# in values that aren't set yet.
+# without touching a terminal's environment variables. The .env file is the
+# source of truth and OVERRIDES any pre-existing environment variable of the
+# same name. This matters because a stale Windows/Mac environment variable
+# (e.g. one an old `setx` left behind) would otherwise silently win over what
+# the wizard just saved -- an invisible footgun for a non-coder. If you truly
+# want an environment variable to win, remove that key from .env.
 def _load_dotenv(path=".env"):
     if not os.path.exists(path):
         return
@@ -21,7 +23,8 @@ def _load_dotenv(path=".env"):
                 continue
             key, _, value = line.partition("=")
             key, value = key.strip(), value.strip().strip('"').strip("'")
-            if key and key not in os.environ:
+            if key:
+                # .env wins on purpose -- see the note above.
                 os.environ[key] = value
 
 
@@ -57,6 +60,11 @@ AI_PROVIDER = os.environ.get("AI_PROVIDER", "anthropic")
 
 # API keys -- only the one matching AI_PROVIDER needs to be set.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+# Only needed if your Anthropic key is an org/admin key that is NOT
+# scoped to a single workspace. Set this to your workspace ID and the
+# app adds the required anthropic-workspace-id header. Easiest fix is
+# usually to just use a normal workspace-scoped key instead.
+ANTHROPIC_WORKSPACE_ID = os.environ.get("ANTHROPIC_WORKSPACE_ID", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")

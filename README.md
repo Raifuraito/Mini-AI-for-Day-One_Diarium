@@ -120,6 +120,58 @@ Worth knowing: Claude Haiku is Anthropic's *cheapest* model, but it's still roug
 
 **How this is estimated**, so you can recompute it for your own journal size or if pricing changes: tagging batches `TAG_BATCH_SIZE` entries (15 by default) per API call, with each entry's text capped at `TAG_SNIPPET_CHARS` (800 characters) plus a short fixed instruction prompt. That works out to roughly 3,300 input tokens and 500 output tokens per batch of 15 entries -- about 67 batches for 1,000 entries, totaling roughly 220,000 input tokens and 33,000 output tokens. Multiply those by whichever provider's per-million-token rate above to get the total. Real cost is usually a bit lower than this estimate, since it assumes every entry uses the full 800-character cap -- shorter entries cost less.
 
+## Optional: run it for free with a local LLM
+
+By default this app uses Anthropic's Claude, which is cheap but not free (see
+the costs above). If you'd rather pay **nothing** and keep every entry 100% on
+your own computer, you can point the app at a **local LLM** instead. Your
+journal text never leaves your machine, and there's no API bill.
+
+How it works: a local LLM runs as a small background server on your own
+computer -- it listens quietly on a local port, and this app sends its
+questions there instead of to Anthropic. The trade-off is quality and speed: a
+model running on your laptop is less capable than Claude and answers more
+slowly (especially without a strong GPU). But for private, offline, zero-cost
+use, it works.
+
+### Setup with Ollama (the tested path)
+
+1. Install Ollama from https://ollama.com -- Windows, Mac, and Linux are all
+   supported.
+2. Download a model. Open a terminal and run:
+
+   ```
+   ollama pull llama3.1
+   ```
+
+   (`llama3.1` is a solid general default. Smaller models are faster; larger
+   ones are smarter but need more memory.)
+3. Make sure Ollama is running -- it usually starts itself and sits in your
+   system tray or menu bar, serving at `http://localhost:11434` automatically.
+4. Tell this app to use it. Open your `.env` file and add:
+
+   ```
+   AI_PROVIDER=ollama
+   OLLAMA_MODEL=llama3.1
+   ```
+
+   (Leave `OLLAMA_BASE_URL` alone -- it defaults to the standard
+   `http://localhost:11434`.)
+5. Restart the app (`python webapp/server.py`). Done -- questions now run on
+   your own machine, for free.
+
+To switch back to Claude, change `AI_PROVIDER` back to `anthropic` (or delete
+the line) and restart.
+
+**Does it run in the background?** Yes. Ollama runs as its own service, not
+inside this app. You start it once (or let it auto-start), and it stays ready
+in the background; this app just talks to it when you ask a question -- it
+doesn't launch or manage the model itself.
+
+> **LM Studio note:** if you already use LM Studio, it can also serve models
+> locally, but this app's built-in local path targets Ollama specifically, so
+> these steps use Ollama -- it's the simplest route.
+
 ## Before you start: what you'll need
 
 - **A computer** (Windows or Mac) to run this on. It stays running only when you want to use it -- it's not a background service you have to leave on all the time (see [Keeping it up to date automatically](#keeping-it-up-to-date-automatically) if you do want that).
@@ -188,7 +240,9 @@ That's it for this page. It writes everything into a file called `.env` inside t
 
 ### Keeping phone and computer in sync automatically
 
-If you journal from both your phone and your computer, exporting and manually moving the file every time gets old fast. The fix: pick **one cloud-synced folder** you already use anyway -- iCloud Drive, Dropbox, Google Drive, whatever -- and point the wizard's **"Sync folder (drop zone)"** field at it. This is separate from the **"Storage folder (local)"** field, which is where exports actually live long-term -- the sync folder is just a temporary channel: `watcher.py` copies anything new out of it into permanent storage and deletes it from the synced copy, so your cloud storage never fills up with old exports.
+> **Most people don't need this anymore.** If you use the automatic nightly export (see *Keeping it up to date automatically*), it already pulls **everything** straight from Day One's cloud -- including entries you wrote on your phone -- so there's nothing to sync by hand. The sync folder below is now an **optional manual fallback**, useful only if your computer ever can't export directly and you want to drop a file in from another device.
+
+If you *do* want the fallback: pick **one cloud-synced folder** you already use anyway -- iCloud Drive, Dropbox, Google Drive, whatever -- and point the wizard's **"Sync folder (optional -- manual fallback)"** field at it. This is separate from the **"Storage folder (local)"** field, which is where exports actually live long-term -- the sync folder is just a temporary channel: `watcher.py` copies anything new out of it into permanent storage and deletes it from the synced copy, so your cloud storage never fills up with old exports. Leave it blank to skip it entirely.
 
 Once that's set up, exporting from either device (following the steps above, just choosing that synced folder as the save location) lands the file in permanent storage automatically within a minute or so, with no extra manual step to move it around.
 
@@ -385,7 +439,7 @@ Or, if you want to get fancy, you could set up a cron job or script to do this a
 
 ### Getting exports there without touching a cable
 
-The wizard's **"Sync folder (drop zone)"** field doesn't have to be a plain local folder — point it at a cloud-sync folder instead (Dropbox, iCloud Drive, OneDrive, Google Drive, Proton Drive, MEGA, or anything similar) and exporting from your phone into that same synced folder means it shows up here automatically within a minute, no manual copying required. The wizard shows every provider with a sensible default path already filled in, plus a Browse button next to each field if you'd rather point-and-click to the exact folder than type a path.
+The wizard's **"Sync folder (optional -- manual fallback)"** field (only needed if you're using the manual drop-in fallback rather than the automatic export) doesn't have to be a plain local folder — point it at a cloud-sync folder instead (Dropbox, iCloud Drive, OneDrive, Google Drive, Proton Drive, MEGA, or anything similar) and exporting from your phone into that same synced folder means it shows up here automatically within a minute, no manual copying required. The wizard shows every provider with a sensible default path already filled in, plus a Browse button next to each field if you'd rather point-and-click to the exact folder than type a path.
 
 **Need to change this later?** Click the &#9881; Settings icon in the main journal app's header — it opens the wizard right where you left off, with your API key already filled in (you don't need to re-enter it unless you're actually replacing it). The same Settings icon is also where you **switch your AI provider or model at any time** — move between Anthropic, OpenAI, Google, Mistral, or a local model (Ollama, LM Studio, etc.), or just change which specific model you're using — without touching any code. Pick the new provider/model, paste its API key if it needs one, and save; the change takes effect on your next question (no re-ingest required, since your journal's embeddings don't depend on which chat model you use).
 
@@ -500,7 +554,7 @@ Your journal stays on your computer. The only things that ever leave it are: the
 
 **Everything else sensitive** -- the vector database (`chroma_db/`), extracted photos (`photos/`), your raw export files, and the chat history log -- also lives only on your computer and is excluded from git the same way. No one else, including whoever built this project, ever has access to any of it. This isn't a hosted service; there's no server anywhere except the one running on your own machine.
 
-**On network exposure specifically:** the setup wizard (`setup_wizard.py`) only ever listens on `127.0.0.1` -- your own computer -- and is never reachable from your phone or any other device, even over Tailscale, since it's the one page that handles your raw API key. The main chat app (`webapp/server.py`) does listen more broadly (`0.0.0.0:5000`) specifically so it's reachable from your phone over Tailscale -- but again, it has no login of its own, so treat that port the way you'd treat a door with no lock: fine on a private network you control (Tailscale), risky on shared/public Wi-Fi without Tailscale, and something you should never expose to the open internet by port-forwarding it on your router.
+**On network exposure specifically:** the setup wizard (`setup_wizard.py`) only ever listens on `127.0.0.1` -- your own computer -- and is never reachable from your phone or any other device, even over Tailscale, since it's the one page that handles your raw API key. The main chat app (`webapp/server.py`) listens more broadly by default (`0.0.0.0:5000`) so it's reachable from your phone over Tailscale -- but it has no login of its own, so treat that port the way you'd treat a door with no lock: fine on a private network you control (Tailscale), risky on shared/public Wi-Fi without Tailscale, and something you should never expose to the open internet by port-forwarding it on your router. **If you only ever use the app on this one computer and want it locked down, add `SERVER_HOST=127.0.0.1` to your `.env`** (and optionally `SERVER_PORT=`) -- that binds it to localhost only, so nothing on your network can reach it at all. To go back to phone access, remove that line.
 
 Full details live in [SECURITY.md](SECURITY.md).
 

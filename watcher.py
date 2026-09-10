@@ -11,11 +11,27 @@ PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 # so no hardcoded path needed -- works on any machine, any Python install.
 PYTHON_EXE = sys.executable
 
+# On Windows, a console program (tasklist, python.exe) launched from a
+# windowless parent pops its OWN console window unless we suppress it.
+# tasklist runs every few seconds, so without this the screen flickers
+# constantly. CREATE_NO_WINDOW keeps every child invisible. Zero on
+# Mac/Linux, where it has no meaning and no effect.
+_NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
 CHROME_CHECK_SECONDS = 5     # how often to check whether Chrome is open
 INGEST_CHECK_SECONDS = 60    # how often to check for new/changed journal exports
 
 server_process = None
 seconds_since_ingest_check = INGEST_CHECK_SECONDS  # run once immediately on startup
+
+# Safety-net: entries are tagged inline during ingest, but if a tagging
+# call ever fails (e.g. a bad API key that day), those entries end up
+# untagged. Once an hour, quietly backfill any that slipped through.
+# find_entries_needing_tags checks locally, so this is free when there's
+# nothing to tag; it only spends API calls on genuinely untagged entries,
+# and only when tagging is enabled.
+TAG_BACKFILL_CHECK_SECONDS = 3600   # hourly
+seconds_since_tag_backfill = 0      # first backfill after one hour, not at startup
 
 
 def is_chrome_running():
@@ -29,7 +45,7 @@ def is_chrome_running():
         if sys.platform == "win32":
             result = subprocess.run(
                 ["tasklist", "/FI", "IMAGENAME eq chrome.exe"],
-                capture_output=True, text=True,
+                capture_output=True, text=True, creationflags=_NO_WINDOW,
             )
             return "chrome.exe" in result.stdout
         else:
@@ -70,7 +86,7 @@ while True:
     if chrome_running and not server_running:
         server_process = subprocess.Popen(
             [PYTHON_EXE, "webapp/server.py"],
-            cwd=PROJECT_DIR
+            cwd=PROJECT_DIR, creationflags=_NO_WINDOW,
         )
 
     # --- Pull new exports from the sync folder into local storage ---
@@ -107,6 +123,21 @@ while True:
         # --- Run ingest on the local storage folder ---
         # ingest.py scans EXPORT_WATCH_DIR and cheaply skips any file
         # whose mtime hasn't changed since last run.
-        subprocess.run([PYTHON_EXE, "ingest.py"], cwd=PROJECT_DIR)
+        subprocess.run([PYTHON_EXE, "ingest.py"], cwd=PROJECT_DIR, creationflags=_NO_WINDOW)
+
+    # --- Hourly tag backfill (safety-net for entries that missed inline tagging) ---
+    seconds_since_tag_backfill += CHROME_CHECK_SECONDS
+    if seconds_since_tag_backfill >= TAG_BACKFILL_CHECK_SECONDS:
+        seconds_since_tag_backfill = 0
+        try:
+            import importlib, config as _cfg2
+            importlib.reload(_cfg2)
+            if getattr(_cfg2, "ENABLE_TAGGING", False):
+                subprocess.run(
+                    [PYTHON_EXE, "tools/tag_backfill.py"],
+                    cwd=PROJECT_DIR, creationflags=_NO_WINDOW,
+                )
+        except Exception as ex:
+            print(f"  (tag backfill skipped this cycle: {ex})")
 
     time.sleep(CHROME_CHECK_SECONDS)

@@ -86,16 +86,19 @@ ENV_PATH = os.path.join(_PROJECT_ROOT, ".env")
 PATH_FIELDS = [
     {
         "env_key": "JOURNAL_SYNC_DIR",
-        "label": "Sync folder (drop zone)",
+        "label": "Sync folder (optional \u2014 manual fallback)",
         "hint": (
-            "A cloud-synced folder where you'll drop journal exports from "
-            "your phone or other devices. New files here are automatically "
-            "copied into the storage folder below and then deleted from here, "
-            "so they don't eat your cloud storage quota. Pick a provider "
-            "below, or Browse to any folder."
+            "OPTIONAL. Leave this blank if you use the automatic export "
+            "(recommended) \u2014 it already pulls everything, including phone "
+            "entries, straight from Day One's cloud. This field is only a "
+            "fallback: if your computer ever can't export directly, you can "
+            "drop a journal export file here (from your phone or another "
+            "device) and the app will copy it into the storage folder below "
+            "and ingest it. Files placed here are moved out after import so "
+            "they don't eat your cloud quota."
         ),
         "default": "",
-        "required": True,
+        "required": False,
     },
     {
         "env_key": "JOURNAL_EXPORT_DIR",
@@ -323,9 +326,14 @@ def _register_autostart():
         launch_exe = _windows_windowless_python(python_exe)
         tr_value = f'"{launch_exe}" "{watcher_path}"'
         try:
+            # No "/RL HIGHEST": creating a *highest-privilege* task requires
+            # admin and was the usual cause of "Access is denied". A normal
+            # per-user logon task needs no elevation, and the watcher doesn't
+            # need elevated rights to run. If a locked-down machine still
+            # refuses, the wizard offers a one-click administrator retry below.
             result = subprocess.run(
                 ["schtasks", "/Create", "/TN", task_name, "/TR", tr_value,
-                 "/SC", "ONLOGON", "/RL", "HIGHEST", "/F"],
+                 "/SC", "ONLOGON", "/F"],
                 capture_output=True, text=True, timeout=30,
             )
             if result.returncode == 0:
@@ -338,24 +346,19 @@ def _register_autostart():
                     "it, and choose Run."
                 )
             return False, (
-                "Windows: couldn't register the auto-start task automatically "
+                "Windows wouldn't register the auto-start task without "
+                "administrator access "
                 f"(schtasks said: {_html.escape(result.stderr.strip() or result.stdout.strip())}). "
-                "This is almost always a permissions issue -- close this wizard, "
-                "right-click PowerShell or Command Prompt and choose &lsquo;Run as "
-                "administrator,&rsquo; then re-run `python setup_wizard.py` from here "
-                "and click Register now again. The app still works in the meantime, "
-                "just needs `python watcher.py` run manually, or see the README for "
-                "the manual Task Scheduler steps."
+                "Click the &ldquo;Retry with administrator access&rdquo; button "
+                "below and choose Yes on the Windows prompt -- that registers it "
+                "in one step. The app still works meanwhile with `python watcher.py`."
             )
         except Exception as e:
             return False, (
-                f"Windows: couldn't register the auto-start task automatically ({e}). "
-                "This is almost always a permissions issue -- close this wizard, "
-                "right-click PowerShell or Command Prompt and choose &lsquo;Run as "
-                "administrator,&rsquo; then re-run `python setup_wizard.py` from here "
-                "and click Register now again. The app still works in the meantime, "
-                "just needs `python watcher.py` run manually, or see the README for "
-                "the manual Task Scheduler steps."
+                f"Windows couldn't register the auto-start task ({e}). "
+                "Click the &ldquo;Retry with administrator access&rdquo; button "
+                "below and choose Yes on the Windows prompt. The app still works "
+                "meanwhile with `python watcher.py`."
             )
 
     if sys.platform == "darwin":
@@ -409,6 +412,69 @@ def _register_autostart():
     return False, (
         "This OS isn't one this auto-start step covers (Windows and Mac are) -- "
         "run `python watcher.py` yourself, in a terminal left open, instead."
+    )
+
+
+def _register_autostart_elevated():
+    """
+    Windows only. Registers the auto-start task WITH ADMINISTRATOR rights by
+    asking Windows to elevate just the schtasks command -- this pops the
+    standard UAC "allow this app to make changes?" dialog. On approval the task
+    is created with the same silent (pythonw) command as the normal path.
+
+    ShellExecuteW with the "runas" verb launches the elevated process
+    asynchronously and doesn't hand back an exit code, so afterwards we poll
+    `schtasks /Query` to confirm the task now exists and report accordingly.
+    """
+    if sys.platform != "win32":
+        return False, "Administrator elevation is a Windows-only step."
+
+    import ctypes
+    import time as _time
+
+    task_name = "MiniAI for DayOne & Diarium Watcher"
+    launch_exe = _windows_windowless_python(sys.executable)
+    watcher_path = os.path.join(_PROJECT_ROOT, "watcher.py")
+
+    # /TR needs the exe + script quoted; inside the /TR "..." wrapper those
+    # inner quotes are escaped as \" so schtasks parses the command correctly.
+    tr_inner = f'\\"{launch_exe}\\" \\"{watcher_path}\\"'
+    params = f'/Create /TN "{task_name}" /TR "{tr_inner}" /SC ONLOGON /F'
+
+    try:
+        # verb "runas" => the UAC prompt. Show flag 0 (SW_HIDE) so no console flashes.
+        rc = ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", "schtasks.exe", params, None, 0
+        )
+    except Exception as e:
+        return False, f"Couldn't open the Windows administrator prompt ({e})."
+
+    # ShellExecuteW returns > 32 on success. 5 = the user clicked "No" on UAC.
+    rc = int(rc)
+    if rc <= 32:
+        if rc == 5:
+            return False, (
+                "Administrator access was declined at the Windows prompt, so "
+                "nothing was registered. Click the button again and choose Yes."
+            )
+        return False, f"The Windows administrator prompt couldn't open (code {rc})."
+
+    # The elevated schtasks runs asynchronously; wait for the task to appear.
+    for _ in range(20):
+        _time.sleep(0.5)
+        check = subprocess.run(
+            ["schtasks", "/Query", "/TN", task_name],
+            capture_output=True, text=True,
+        )
+        if check.returncode == 0:
+            return True, (
+                f'Registered "{task_name}" with administrator access. It starts '
+                "silently at your next log on or restart. To confirm now without "
+                "waiting, open Task Scheduler Library, right-click it, and choose Run."
+            )
+    return False, (
+        "The administrator prompt was approved, but the task didn't show up yet "
+        "-- give it a moment and click the button once more."
     )
 
 
@@ -503,6 +569,7 @@ def render_page(banner_html, env_values, path_values, tagging_enabled=False):
 
     # --- API keys ---
     page = page.replace("__API_KEY_ANTHROPIC__", _html.escape(env_values.get("ANTHROPIC_API_KEY", "")))
+    page = page.replace("__ANTHROPIC_WORKSPACE_ID__", _html.escape(env_values.get("ANTHROPIC_WORKSPACE_ID", "")))
     page = page.replace("__API_KEY_OPENAI__", _html.escape(env_values.get("OPENAI_API_KEY", "")))
     page = page.replace("__API_KEY_GOOGLE__", _html.escape(env_values.get("GOOGLE_API_KEY", "")))
     page = page.replace("__API_KEY_MISTRAL__", _html.escape(env_values.get("MISTRAL_API_KEY", "")))
@@ -959,6 +1026,10 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
         <div class="hint">From <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> &rarr; Settings &rarr; API Keys.<br>Already saved a key below? You don't need to re-enter it &mdash; it's kept as-is unless you type a new one.</div>
       </label>
       <input type="password" name="ANTHROPIC_API_KEY" value="__API_KEY_ANTHROPIC__" placeholder="sk-ant-...">
+      <label>Workspace ID <span style="font-weight:400;color:#8B8478">(optional)</span>
+        <div class="hint">Leave blank for a normal API key. Only fill this in if you see an error about your key "not being scoped to a workspace" &mdash; then paste your workspace ID (looks like <code>wrkspc_&hellip;</code>), found in the Anthropic console under your workspace's settings.</div>
+      </label>
+      <input type="text" name="ANTHROPIC_WORKSPACE_ID" value="__ANTHROPIC_WORKSPACE_ID__" placeholder="wrkspc_... (optional)">
       <label>Model
         <div class="hint">Haiku is cheapest; Sonnet balances cost and quality; Opus is the most capable.</div>
       </label>
@@ -1126,6 +1197,24 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
       </button>
     </div>
     <div class="autostart-result" id="autostart-result"></div>
+    <button type="button" class="autostart-btn" id="autostart-admin-btn"
+            style="display:none" onclick="registerAutostartAdmin()">
+      Retry with administrator access
+    </button>
+  </div>
+
+  <div class="autostart-section" id="nightly-section">
+    <strong>Step 6: Schedule the nightly export (optional)</strong>
+    <p>Have your journal export itself every night while you sleep, so new
+       entries and photos flow in with zero effort. Only needed if you want
+       fully hands-off automation. (Requires the one-time interactive login
+       first &mdash; run <code>python dayone_web_export.py</code> once and log
+       into Day One.)</p>
+    <button type="button" class="autostart-btn" id="nightly-btn"
+            onclick="scheduleNightly()">
+      Schedule nightly export
+    </button>
+    <div class="autostart-result" id="nightly-result"></div>
   </div>
 
     <button type="submit">Save</button>
@@ -1286,10 +1375,62 @@ function registerAutostart() {
       result.className = 'autostart-result ' + (data.ok ? 'ok' : 'err');
       result.textContent = data.message;
       result.style.display = 'block';
+      // On failure (usually a permissions block) reveal the one-click
+      // administrator retry; hide it again on success.
+      var adminBtn = document.getElementById('autostart-admin-btn');
+      if (adminBtn) adminBtn.style.display = data.ok ? 'none' : 'inline-block';
     })
     .catch(function() {
       btn.disabled = false;
       btn.textContent = 'Register now';
+      result.className = 'autostart-result err';
+      result.textContent = 'Something went wrong -- check the terminal window.';
+      result.style.display = 'block';
+    });
+}
+
+function registerAutostartAdmin() {
+  var btn = document.getElementById('autostart-admin-btn');
+  var result = document.getElementById('autostart-result');
+  btn.disabled = true;
+  btn.textContent = 'Waiting for the Windows prompt...';
+  fetch('/autostart-register-admin', {method: 'POST'})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = 'Retry with administrator access';
+      result.className = 'autostart-result ' + (data.ok ? 'ok' : 'err');
+      result.textContent = data.message;
+      result.style.display = 'block';
+      if (data.ok) btn.style.display = 'none';
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Retry with administrator access';
+      result.className = 'autostart-result err';
+      result.textContent = 'Something went wrong -- check the terminal window.';
+      result.style.display = 'block';
+    });
+}
+
+function scheduleNightly() {
+  var btn = document.getElementById('nightly-btn');
+  var result = document.getElementById('nightly-result');
+  btn.disabled = true;
+  btn.textContent = 'Scheduling... (approve the Windows prompt if it appears)';
+  result.style.display = 'none';
+  fetch('/schedule-nightly', {method: 'POST'})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = data.ok ? 'Scheduled!' : 'Schedule nightly export';
+      result.className = 'autostart-result ' + (data.ok ? 'ok' : 'err');
+      result.textContent = data.message;
+      result.style.display = 'block';
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Schedule nightly export';
       result.className = 'autostart-result err';
       result.textContent = 'Something went wrong -- check the terminal window.';
       result.style.display = 'block';
@@ -1416,6 +1557,9 @@ def save():
     values["AI_PROVIDER"] = provider
     if key_field and api_key:
         values[key_field] = api_key
+    # Optional Anthropic workspace ID -- written as given (blank clears it), so
+    # a user with an org/admin key can supply it without hand-editing .env.
+    values["ANTHROPIC_WORKSPACE_ID"] = (request.form.get("ANTHROPIC_WORKSPACE_ID") or "").strip()
     # Save model choices for the active provider. If a dropdown's value is
     # "custom", the real model ID comes from its companion "<FIELD>_CUSTOM"
     # text box instead -- this is what lets a model newer than this
@@ -1597,8 +1741,45 @@ def autostart_preview():
 
 @app.route("/autostart-register", methods=["POST"])
 def autostart_register():
-    """Actually registers the auto-start task."""
+    """Actually registers the auto-start task (normal, no elevation)."""
     ok, message = _register_autostart()
+    return jsonify({"ok": ok, "message": message})
+
+
+@app.route("/autostart-register-admin", methods=["POST"])
+def autostart_register_admin():
+    """Registers the auto-start task with an administrator (UAC) prompt."""
+    ok, message = _register_autostart_elevated()
+    return jsonify({"ok": ok, "message": message})
+
+
+def _schedule_nightly_export():
+    """
+    Registers the nightly auto-export job by running schedule_export.py, so
+    the Windows/Mac scheduling logic (and its admin-elevation fallback) lives
+    in exactly one place instead of being duplicated here. Returns
+    (ok, message) for the wizard to display.
+    """
+    script = os.path.join(_PROJECT_ROOT, "schedule_export.py")
+    if not os.path.exists(script):
+        return False, "Couldn't find schedule_export.py next to the wizard."
+    try:
+        result = subprocess.run(
+            [sys.executable, script],
+            capture_output=True, text=True, timeout=120, cwd=_PROJECT_ROOT,
+        )
+        out = (result.stdout or "").strip()
+        err = (result.stderr or "").strip()
+        ok = result.returncode == 0 and "nstalled" in out
+        return ok, (out or err or "The scheduler produced no output.")
+    except Exception as e:
+        return False, f"Couldn't run the scheduler: {e}"
+
+
+@app.route("/schedule-nightly", methods=["POST"])
+def schedule_nightly():
+    """Registers the nightly Day One export job (optional, full automation)."""
+    ok, message = _schedule_nightly_export()
     return jsonify({"ok": ok, "message": message})
 
 

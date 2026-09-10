@@ -43,3 +43,11 @@ desktop.ini
 _to_delete/
 _cleanup/
 docs/PHOTO_EMBEDDING_FIX.md
+
+# Day One web-export automation: saved browser login session (NEVER commit)
+dayone_profile/
+
+# Export automation logs
+export.log
+watcher.log
+*.bak
