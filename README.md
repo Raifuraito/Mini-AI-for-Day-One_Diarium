@@ -437,6 +437,37 @@ Or, if you want to get fancy, you could set up a cron job or script to do this a
 
 > **Windows specifically:** registering the task and the task actually *firing* are two different moments. "At log on" is a real Windows trigger type that only fires at the moment you log in -- it has no way to fire retroactively for the session you were already in when you clicked Register. So right after registering, checking Task Scheduler will correctly show it's never run yet; that's expected, not a failure. The very next time you log off and back on (or restart), it'll fire on its own with zero further action -- and every login after that, forever. You don't need to test it by hand, though right-clicking the task in Task Scheduler Library and choosing Run will fire it immediately if you want to confirm it works without waiting for a real logon. (Mac's LaunchAgent doesn't have this quirk -- it starts immediately when registered.)
 
+### When does the nightly export actually run? (sleep vs. shutdown)
+
+The nightly export is scheduled for a set time (3 AM by default). Whether it
+actually fires at that time depends on what your computer is doing:
+
+- **Asleep** &rarr; it works. Windows *wakes the PC from sleep* at the scheduled
+  time, runs the export, and lets it sleep again. You'd never notice.
+- **Fully shut down** &rarr; it *cannot* run at 3 AM. Nothing can wake a
+  powered-off computer &mdash; that's just how computers work, not a bug. But
+  you won't lose anything: the task is set to **run the next time you turn the
+  computer on** instead. So if the PC is off overnight and you boot it at 9 AM,
+  the export simply runs at 9 AM.
+
+**What to do about it:**
+
+- If your computer is usually **on or asleep** overnight, do nothing &mdash; it
+  runs at 3 AM on its own. For a laptop, leaving it **plugged in and asleep** is
+  the ideal setup: no battery drain worries, and the export fires on time.
+- If you **shut your computer down** every night, either leave it asleep
+  instead, or just let the export run whenever you next turn it on (it catches
+  up automatically &mdash; you don't miss entries, it just happens later than 3 AM).
+- Prefer a specific daytime instead? Re-schedule it for a time your computer is
+  normally on: `python schedule_export.py --time 18:00` (that's 6 PM).
+
+**Does sleep drain the battery?** A little &mdash; sleep keeps memory powered, so
+a laptop loses roughly 1&ndash;2% per hour (about 10&ndash;15% over a night). If
+it's plugged in, that doesn't matter at all. Note that an *unplugged* laptop may
+slip into **hibernate** after a while, which is effectively "off" and won't wake
+for the 3 AM run &mdash; so for the scheduled export, keep it plugged in and
+asleep, or just rely on the "runs when you next turn it on" behavior above.
+
 ### Getting exports there without touching a cable
 
 The wizard's **"Sync folder (optional -- manual fallback)"** field (only needed if you're using the manual drop-in fallback rather than the automatic export) doesn't have to be a plain local folder — point it at a cloud-sync folder instead (Dropbox, iCloud Drive, OneDrive, Google Drive, Proton Drive, MEGA, or anything similar) and exporting from your phone into that same synced folder means it shows up here automatically within a minute, no manual copying required. The wizard shows every provider with a sensible default path already filled in, plus a Browse button next to each field if you'd rather point-and-click to the exact folder than type a path.
