@@ -48,7 +48,7 @@ If you don't journal digitally in a format this can read, this project won't be 
 
 ### How to get your journal export into this project
 
-**If you use Day One:** this project needs a JSON export file. Day One lets you export from every platform, but **not every platform is equal** — the key difference is whether you can export *just the new entries* (incremental) or have to re-export *your entire journal* every time:
+**If you use Day One:** the recommended path is the **automatic nightly export** (see the note just below) — you set it up once and never think about exporting again. Everything else in this section is about exporting **manually**, which you only need for a one-off or if you skip the automatic route. Day One lets you export manually from every platform, but **not every platform is equal** — the difference is whether you can export *just the new entries* or have to re-export *your entire journal* every time:
 
 | Platform | What you can filter | Best for |
 |---|---|---|
@@ -57,7 +57,7 @@ If you don't journal digitally in a format this can read, this project won't be 
 | **Mac** | ⚠️ Tag filter + manual Cmd/Shift+click in list view | OK for selective exports, but no date range picker |
 | **Windows / Web** | ❌ No filtering — full journal only | Gets the job done, but every export is everything |
 
-> **There is no automatic sync.** Because of limitations with Day One's (and Diarium's) export system, there's no way to make uploads fully automatic. The closest thing is iPhone's date-range export — set it to "since your last export," save it to your sync folder with a [one-tap Shortcut](#getting-exports-there-without-touching-a-cable), and you're done in about 10 seconds. That's as seamless as it gets.
+> **Good news: for Day One, this is now fully automatic.** A built-in nightly job (`dayone_web_export.py`, set up for you by the wizard) signs into the Day One web app in a saved browser session and exports your **entire** journal — text *and* photos — straight into your export folder while you sleep; the watcher then ingests it. So there's **nothing to export by hand and nothing to sync** — new entries just show up. The manual methods below still work as a fallback (a one-off, or if you'd rather not use the automatic export), but most people won't need them.
 
 **Why this matters:** if you journal every day and want to update weekly, re-exporting your entire 1,000+ entry journal each time is slow. Your phone is the fastest way to do ongoing updates, since it's the only device that lets you export just the new entries by date range.
 
@@ -69,7 +69,7 @@ If you don't journal digitally in a format this can read, this project won't be 
 - **Windows + Android**: same idea — export from your Android phone for date-range updates, since Windows can't filter at all.
 - **Windows only (no phone app)**: workable, but every export is the full journal. Fine for getting started; just slower for ongoing updates.
 
-Regardless of which device you export from, the steps are the same: export as **JSON**, save the `.zip` into your **sync folder**, and `watcher.py` picks it up automatically.
+For any **manual** export, the steps are the same: export as **JSON** and save the `.zip` into your **export folder** (or a sync folder that feeds it); `watcher.py` picks it up automatically. But with the automatic nightly export set up, you won't need to do this at all.
 
 **If you use Diarium:** Diarium syncs continuously through your own cloud folder, so there's no export-and-reupload dance at all — the catch is that Cloud Sync is a separate paid upgrade *on each platform* (the Windows app ships with it included; iPhone, Android, and Mac each need their own purchase to unlock it), and Google Drive specifically is the slowest of Diarium's supported cloud backends, if you have a choice of provider.
 
@@ -212,7 +212,21 @@ That's it for this page. It writes everything into a file called `.env` inside t
 
 ## Step 3: Export your journal
 
-### Exporting from a computer
+### The automatic way (recommended, Day One)
+
+Most people should use this and skip the manual steps entirely. The setup wizard can register a **nightly auto-export**: once a night it opens the Day One web app in a saved browser login and exports your whole journal (text + photos) straight into your export folder, and the watcher ingests it — no clicking, no files to move.
+
+**One-time setup:**
+
+1. Run `python dayone_web_export.py` once, in a visible window, and **log into Day One** when the browser opens. Your login is saved (in `dayone_profile/`) and reused from then on.
+2. Let that first run finish — it downloads all your media once (can be a few GB, so give it time), then saves the export and the watcher ingests it.
+3. Schedule it: click **"Schedule nightly export"** in the setup wizard (or run `python schedule_export.py`). From then on it exports and ingests itself every night. (See *[Keeping it up to date automatically](#keeping-it-up-to-date-automatically)* for the sleep-vs-shutdown timing note.)
+
+If Day One ever signs your saved session out, the nightly run fails politely and pops a notification asking you to run `python dayone_web_export.py` once to log back in.
+
+> **Diarium or another app?** The automatic export is Day One-specific. For anything else, use the manual export below.
+
+### Exporting from a computer (manual fallback)
 
 **Day One (Mac app):** right-click your journal in the sidebar → Export → choose **JSON** (check "include media" if you want photo search) → save the file into the export folder you set up in Step 2. You can also select specific entries first (switch to List view, Cmd+click or Shift+click to select) and right-click → Export to export just those.
 

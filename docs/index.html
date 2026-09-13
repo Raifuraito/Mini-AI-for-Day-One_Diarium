@@ -1133,7 +1133,7 @@
       <div class="section-head prose">
         <span class="eyebrow">What this is</span>
         <h2>A small, source-available tool that answers questions about your journal.</h2>
-        <p class="lede">Runs on your computer, with your own API key &mdash; no account, nothing in between. Export from Day One or Diarium, point this at the file, start asking.</p>
+        <p class="lede">Runs on your computer, with your own API key &mdash; no account, nothing in between. Point it at your Day One journal and it keeps itself up to date, exporting and ingesting automatically every night. (Other apps work too, with a manual export.)</p>
       </div>
 
       <div class="about-grid">
@@ -1257,15 +1257,15 @@
         <div class="step">
           <div class="step-num">1</div>
           <div>
-            <h3>Export your journal</h3>
-            <p>Open Day One or Diarium and use its export option to save your entries as a file. How easy this is depends on which app and device you use &mdash; see <a href="#limitations">Before you export</a> below.</p>
+            <h3>Connect your journal (it exports itself)</h3>
+            <p>For <strong>Day One</strong>, you log in once and a nightly job exports your whole journal &mdash; text and photos &mdash; by itself, straight onto your computer. No manual exporting, ever. Using another app, or want to export by hand? That works too &mdash; see <a href="#limitations">Before you export</a> below.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-num">2</div>
           <div>
-            <h3>Get that file onto this computer</h3>
-            <p>Already journaling on this computer? Skip this one. Exported from your phone instead? Point the setup wizard at a cloud-sync folder &mdash; Dropbox, iCloud, OneDrive, whatever you already use &mdash; and exports dropped there are picked up and ingested automatically from then on. Emailing the file to yourself or a cable both still work fine too, just as one-off manual copies.</p>
+            <h3>Get the file onto this computer (only if exporting manually)</h3>
+            <p>With the automatic Day One export, <strong>skip this</strong> &mdash; the file already lands on your computer. Exporting by hand or from another app instead? Drop the file in your export folder, or point the wizard at a cloud-sync folder (Dropbox, iCloud, OneDrive&hellip;) and anything dropped there is picked up automatically.</p>
           </div>
         </div>
         <div class="step">
@@ -1285,14 +1285,14 @@
         <div class="step">
           <div class="step-num">5</div>
           <div>
-            <h3>Drop the file in, and ask away</h3>
-            <p>Put the export in the folder you chose and start asking &mdash; the setup wizard already registered a watcher that checks for new exports every 60 seconds and ingests anything new by itself, so there's no command to run here. Full walkthrough is in the repo's README.</p>
+            <h3>Ask away</h3>
+            <p>With the automatic export set up, there's nothing to drop in &mdash; new entries flow in on their own. A watcher checks for new exports every 60 seconds and ingests anything new by itself, so there's no command to run. (Exporting manually? Just put the file in your export folder and it's picked up within a minute.) Full walkthrough is in the repo's README.</p>
           </div>
         </div>
       </div>
 
       <div class="workflow">
-        <p class="workflow-cap">steps 1 &amp; 2, drawn out&hellip; (the folder on the right watches itself)</p>
+        <p class="workflow-cap">how it flows, automatically for Day One (the folder on the right watches itself)</p>
         <div class="workflow-row">
           <div class="workflow-node">
             <div class="workflow-icon">
@@ -1303,7 +1303,7 @@
           </div>
 
           <div class="workflow-connector">
-            <span class="caption">export</span>
+            <span class="caption">nightly auto-export</span>
             <svg width="70" height="24" viewBox="0 0 70 24" fill="none"><path d="M2 12C20 6 40 18 58 11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M49 4L60 11L48 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
 
@@ -1312,11 +1312,11 @@
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v15a1 1 0 01-1 1H6a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 2v5h5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
             </div>
             <div class="label">the exported file</div>
-            <div class="sub">on your phone or computer</div>
+            <div class="sub">text + photos, one zip</div>
           </div>
 
           <div class="workflow-connector">
-            <span class="caption">cloud sync, or however's easiest</span>
+            <span class="caption">saved straight to your computer</span>
             <svg width="70" height="24" viewBox="0 0 70 24" fill="none"><path d="M2 12C20 6 40 18 58 11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M49 4L60 11L48 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
 
@@ -1345,7 +1345,7 @@
       <div class="limitations-grid">
         <div class="limitation-card">
           <h3>If you use Day One</h3>
-          <p style="background:#f5f0e8;border-left:3px solid #b8a88a;padding:10px 14px;font-size:13px;margin-bottom:14px;line-height:1.5;"><strong>There is no automatic sync.</strong> Because of limitations with Day One&rsquo;s export system, uploads can&rsquo;t be fully automatic. The closest thing: iPhone&rsquo;s date-range export + a one-tap Shortcut that drops it into your sync folder. About 10 seconds, and that&rsquo;s as seamless as it gets.</p>
+          <p style="background:#f5f0e8;border-left:3px solid #b8a88a;padding:10px 14px;font-size:13px;margin-bottom:14px;line-height:1.5;"><strong>Exporting is now automatic.</strong> A built-in nightly job signs into the Day One web app in a saved browser session and exports your whole journal &mdash; text and photos &mdash; straight onto your computer, then ingests it. Nothing to export by hand. The manual options below are just a fallback. (Note: the automatic export always pulls the full journal, so the per-platform filtering below only matters if you export manually.)</p>
           <p>Every platform can export, but not every platform can export <em>just the new entries</em>:</p>
           <dl class="limitation-split">
             <dt>iPhone</dt>
