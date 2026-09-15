@@ -150,6 +150,21 @@ def rough_token_estimate(text):
     return len(text) // 4
 
 
+_RECENCY_RE = re.compile(
+    r"\b(latest|most recent|newest|last entry|last entries|my last|"
+    r"the last|what did i (?:just|recently)|lately|recently|"
+    r"most recently|newest entry)\b",
+    re.IGNORECASE,
+)
+
+
+def is_recency_question(question):
+    """True when the user is asking for the *most recent* entries ("my latest
+    entry", "what did I write recently"). Plain semantic search can't rank by
+    time, so these need date-sorted retrieval (newest first)."""
+    return bool(_RECENCY_RE.search(question or ""))
+
+
 def detect_date_range(question):
     q = question.lower()
 
@@ -238,7 +253,11 @@ def retrieve_context(question, collection, n_results=None, diversify=False, forc
         ]
 
         if matched:
-            matched.sort(key=lambda p: p[1].get("date", ""))
+            # Newest-first when the question asks for the "latest/most recent"
+            # (so "latest entry in August" surfaces the real latest, not Aug 1);
+            # oldest-first otherwise, as before.
+            matched.sort(key=lambda p: p[1].get("date", ""),
+                         reverse=is_recency_question(question))
             cap = effective_chunk_cap(question, n_results, force_max=force_max)
             results = matched[:cap] if len(matched) > cap else matched
             if diversify and len(results) > 3:
@@ -249,6 +268,19 @@ def retrieve_context(question, collection, n_results=None, diversify=False, forc
                 random.shuffle(rest)
                 return top + rest
             return results
+
+    # Recency questions with no explicit month ("my latest entry", "what did
+    # I write most recently") -- semantic search can't rank by time, so pull
+    # the entries with the newest dates directly.
+    if is_recency_question(question):
+        all_results = collection.get(include=["documents", "metadatas"])
+        docs = all_results.get("documents", [])
+        metas = all_results.get("metadatas", [])
+        dated = [(doc, meta) for doc, meta in zip(docs, metas) if meta.get("date")]
+        if dated:
+            dated.sort(key=lambda p: p[1].get("date", ""), reverse=True)
+            cap = effective_chunk_cap(question, n_results, force_max=force_max)
+            return dated[:cap]
 
     effective_n = effective_chunk_cap(question, n_results, force_max=force_max)
     # Fetch a slightly larger pool when diversifying, then sample from it

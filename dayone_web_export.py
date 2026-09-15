@@ -258,6 +258,18 @@ def _open_export_dialog(page):
     Fallback: click through the UI (Edit Journal -> Journal Settings ->
     Export Journal), the same path a person would take.
     """
+    def _dismiss_overlays():
+        # Day One sometimes leaves a modal backdrop on top
+        # (components-modal__screen-overlay) that silently *intercepts clicks*
+        # -- the exact failure that made a nightly run time out. A few Escape
+        # presses close whatever stray dialog is open; harmless if none is.
+        for _ in range(3):
+            try:
+                page.keyboard.press("Escape")
+                time.sleep(0.4)
+            except Exception:
+                break
+
     def _find_button(timeout):
         b = page.get_by_text("Export journal JSON file", exact=False).first
         b.wait_for(state="visible", timeout=timeout)
@@ -267,6 +279,7 @@ def _open_export_dialog(page):
     # domcontentloaded (not the full load event) this opens the dialog reliably.
     try:
         print("  [dialog] opening export via direct link...", flush=True)
+        _dismiss_overlays()
         page.goto("about:blank")
         page.goto(EXPORT_URL, wait_until="domcontentloaded", timeout=60_000)
         b = _find_button(30_000)
@@ -276,10 +289,13 @@ def _open_export_dialog(page):
         print(f"  [dialog] direct link failed ({e}); trying the menus...", flush=True)
 
     # Fallback: click through the menus (text-based -- 'Edit Journal' isn't a
-    # plain button role).
-    page.get_by_text("Edit Journal", exact=False).first.click(timeout=30_000)
-    page.get_by_text("Journal Settings", exact=False).first.click(timeout=15_000)
-    page.get_by_text("Export Journal", exact=False).last.click(timeout=15_000)
+    # plain button role). Escape first to clear a stray modal, and force=True so
+    # the click punches through any leftover transparent overlay instead of
+    # being intercepted by it.
+    _dismiss_overlays()
+    page.get_by_text("Edit Journal", exact=False).first.click(timeout=30_000, force=True)
+    page.get_by_text("Journal Settings", exact=False).first.click(timeout=15_000, force=True)
+    page.get_by_text("Export Journal", exact=False).last.click(timeout=15_000, force=True)
     return _find_button(30_000)
 
 
@@ -662,12 +678,15 @@ if __name__ == "__main__":
         if mode in ("warmup", "sync"):
             warmup()
         elif mode == "nightly":
-            # NOT headless: Day One's web app (especially the media
-            # download flow) is unreliable in a headless browser, but
-            # rock-solid in a real one. The scheduler runs this while
-            # you're asleep, so a briefly-visible window is harmless and
-            # buys far more reliability than headless would.
-            run(headless=False, nightly=True)
+            # Normally NOT headless: Day One's web app (especially the media
+            # download flow) is unreliable in a headless browser but rock-solid
+            # in a real one, and the 3am run is unattended so a briefly-visible
+            # window is harmless. To TEST fully-invisible mode, pass a second
+            # arg:  python dayone_web_export.py nightly headless
+            # If that produces a good export, you can wire it into the schedule;
+            # if it hangs or fails, drop the "headless" arg and keep the visible
+            # window (which you won't see at 3am anyway).
+            run(headless=("headless" in sys.argv), nightly=True)
         else:
             run(headless=False, nightly=False)
     except ImportError:
