@@ -600,4 +600,7 @@ if __name__ == "__main__":
     # (more private/secure). Never expose this port to the public internet.
     _host = os.environ.get("SERVER_HOST", "0.0.0.0")
     _port = int(os.environ.get("SERVER_PORT", "5000"))
-    app.run(host=_host, port=_port, debug=False)
+    # threaded=True so a single slow/stuck request (e.g. a vector-DB query
+    # that hangs after a background ingest) can't freeze every other
+    # request behind it and wedge the whole app.
+    app.run(host=_host, port=_port, debug=False, threaded=True)

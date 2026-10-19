@@ -321,44 +321,52 @@ def _register_autostart():
     watcher_path = os.path.join(_PROJECT_ROOT, "watcher.py")
 
     if sys.platform == "win32":
-        task_name = "MiniAI for DayOne & Diarium Watcher"
-        # pythonw.exe instead of python.exe -- silent, no console window at login.
-        launch_exe = _windows_windowless_python(python_exe)
-        tr_value = f'"{launch_exe}" "{watcher_path}"'
+        # Most reliable per-user auto-start on Windows: a tiny launcher in the
+        # user's Startup folder. Unlike Task Scheduler (which needed admin for
+        # some options, hit "Access is denied", and only fired at the *next*
+        # logon), this needs no admin, runs in the user's own session (required
+        # for the browser automation), starts silently via pythonw, AND is a
+        # self-healing loop -- if the watcher ever stops, it starts it again.
+        startup_dir = os.path.join(
+            os.environ.get("APPDATA", os.path.expanduser("~")),
+            "Microsoft", "Windows", "Start Menu", "Programs", "Startup",
+        )
+        launcher_path = os.path.join(startup_dir, "MiniAI Journal Watcher.vbs")
+        launch_exe = _windows_windowless_python(python_exe)  # pythonw.exe
+        vbs = (
+            "' Auto-starts the Mini AI journal watcher silently at login and\n"
+            "' restarts it if it ever stops. Created by setup_wizard.py --\n"
+            "' delete this file to turn auto-start off.\n"
+            'Dim sh : Set sh = CreateObject(\"WScript.Shell\")\n'
+            f'sh.CurrentDirectory = \"{_PROJECT_ROOT}\"\n'
+            "Do\n"
+            f'    sh.Run \"\"\"{launch_exe}\"\" watcher.py\", 0, True\n'
+            "    WScript.Sleep 5000\n"
+            "Loop\n"
+        )
         try:
-            # No "/RL HIGHEST": creating a *highest-privilege* task requires
-            # admin and was the usual cause of "Access is denied". A normal
-            # per-user logon task needs no elevation, and the watcher doesn't
-            # need elevated rights to run. If a locked-down machine still
-            # refuses, the wizard offers a one-click administrator retry below.
-            result = subprocess.run(
-                ["schtasks", "/Create", "/TN", task_name, "/TR", tr_value,
-                 "/SC", "ONLOGON", "/F"],
-                capture_output=True, text=True, timeout=30,
-            )
-            if result.returncode == 0:
-                return True, (
-                    f'Windows: registered "{task_name}" in Task Scheduler, set to start at '
-                    "login. It won't fire until your *next* actual log on or restart -- "
-                    "checking Task Scheduler right now will correctly show it's never run "
-                    "yet, and that's expected, not a failure. If you want to confirm it "
-                    "works without waiting, find it in Task Scheduler Library, right-click "
-                    "it, and choose Run."
-                )
-            return False, (
-                "Windows wouldn't register the auto-start task without "
-                "administrator access "
-                f"(schtasks said: {_html.escape(result.stderr.strip() or result.stdout.strip())}). "
-                "Click the &ldquo;Retry with administrator access&rdquo; button "
-                "below and choose Yes on the Windows prompt -- that registers it "
-                "in one step. The app still works meanwhile with `python watcher.py`."
+            os.makedirs(startup_dir, exist_ok=True)
+            with open(launcher_path, "w", encoding="utf-8") as f:
+                f.write(vbs)
+            started_now = False
+            try:
+                os.startfile(launcher_path)  # runs hidden via wscript
+                started_now = True
+            except Exception:
+                pass
+            extra = (" It just started running now too, so you don't even need "
+                     "to log out and back in." if started_now else "")
+            return True, (
+                "Windows: the watcher will now start automatically and silently "
+                "every time you log in -- a small launcher was added to your "
+                "Startup folder (no admin needed, no terminal to keep open), and "
+                "if it ever stops it restarts itself." + extra
             )
         except Exception as e:
             return False, (
-                f"Windows couldn't register the auto-start task ({e}). "
-                "Click the &ldquo;Retry with administrator access&rdquo; button "
-                "below and choose Yes on the Windows prompt. The app still works "
-                "meanwhile with `python watcher.py`."
+                f"Windows: couldn't set up auto-start ({e}). The app still works "
+                "meanwhile -- run `python watcher.py`, or double-click "
+                "`start_watcher.vbs` in the project folder."
             )
 
     if sys.platform == "darwin":
